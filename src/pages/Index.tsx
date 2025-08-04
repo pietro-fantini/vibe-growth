@@ -57,6 +57,8 @@ const Index = () => {
   const [newSubgoalType, setNewSubgoalType] = useState<'one_time' | 'recurring'>('one_time');
   const [newSubgoalTarget, setNewSubgoalTarget] = useState("1");
   const [editingSubgoalTitle, setEditingSubgoalTitle] = useState("");
+  const [editingSubgoalTarget, setEditingSubgoalTarget] = useState<string | null>(null);
+  const [editingSubgoalTargetValue, setEditingSubgoalTargetValue] = useState("");
 
   // Pastel color options
   const pastelColors = [
@@ -308,6 +310,36 @@ const Index = () => {
       toast({
         title: "Error updating subgoal",
         description: "Failed to update subgoal. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateSubgoalTarget = async (subgoalId: string, newTarget: string) => {
+    const targetValue = parseInt(newTarget);
+    if (!targetValue || targetValue < 1) return;
+    
+    try {
+      const { error } = await supabase
+        .from('subgoals')
+        .update({ target_count: targetValue })
+        .eq('id', subgoalId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      await fetchGoals();
+      setEditingSubgoalTarget(null);
+      setEditingSubgoalTargetValue("");
+      
+      toast({
+        description: "✨ Subgoal target updated successfully!",
+      });
+    } catch (error) {
+      console.error('Error updating subgoal target:', error);
+      toast({
+        title: "Error updating subgoal target",
+        description: "Failed to update subgoal target. Please try again.",
         variant: "destructive",
       });
     }
@@ -832,17 +864,60 @@ const Index = () => {
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
-                               <div className="flex items-center gap-2">
-                                 <Progress 
-                                   value={subgoal.target_count > 0 
-                                     ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100)
-                                     : 0
-                                   } 
-                                   className="flex-1 h-2"
-                                 />
-                                 <Badge variant="outline" className="text-xs">
-                                   {subgoal.current_progress || 0}/{subgoal.target_count}
-                                 </Badge>
+                                <div className="flex items-center gap-2">
+                                  <Progress 
+                                    value={subgoal.target_count > 0 
+                                      ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100)
+                                      : 0
+                                    } 
+                                    className="flex-1 h-2"
+                                  />
+                                  {editingSubgoalTarget === subgoal.id ? (
+                                    <div className="flex items-center gap-1">
+                                      <Input
+                                        type="number"
+                                        value={editingSubgoalTargetValue}
+                                        onChange={(e) => setEditingSubgoalTargetValue(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') updateSubgoalTarget(subgoal.id, editingSubgoalTargetValue);
+                                          if (e.key === 'Escape') {
+                                            setEditingSubgoalTarget(null);
+                                            setEditingSubgoalTargetValue("");
+                                          }
+                                        }}
+                                        className="h-6 w-12 text-xs"
+                                        min="1"
+                                        autoFocus
+                                      />
+                                      <span className="text-xs">/</span>
+                                      <span className="text-xs">{subgoal.current_progress || 0}</span>
+                                      <Button size="sm" onClick={() => updateSubgoalTarget(subgoal.id, editingSubgoalTargetValue)} className="h-6 w-6 p-0">
+                                        <Check className="h-3 w-3" />
+                                      </Button>
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        onClick={() => {
+                                          setEditingSubgoalTarget(null);
+                                          setEditingSubgoalTargetValue("");
+                                        }}
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <Badge 
+                                      variant="outline" 
+                                      className="text-xs cursor-pointer hover:bg-muted"
+                                      onClick={() => {
+                                        setEditingSubgoalTarget(subgoal.id);
+                                        setEditingSubgoalTargetValue(subgoal.target_count.toString());
+                                      }}
+                                    >
+                                      {subgoal.current_progress || 0}/{subgoal.target_count}
+                                    </Badge>
+                                  )}
                                  <div className="flex items-center gap-1">
                                    <Button
                                      size="sm"
