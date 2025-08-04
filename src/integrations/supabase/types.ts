@@ -14,16 +14,160 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      goal_progress: {
+        Row: {
+          completed_count: number
+          created_at: string
+          goal_id: string
+          id: string
+          period: string
+          updated_at: string
+        }
+        Insert: {
+          completed_count?: number
+          created_at?: string
+          goal_id: string
+          id?: string
+          period: string
+          updated_at?: string
+        }
+        Update: {
+          completed_count?: number
+          created_at?: string
+          goal_id?: string
+          id?: string
+          period?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_progress_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "current_goal_progress"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_progress_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goal_history"
+            referencedColumns: ["goal_id"]
+          },
+          {
+            foreignKeyName: "goal_progress_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      goals: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          frequency: string | null
+          id: string
+          is_active: boolean
+          start_date: string
+          target_count: number
+          title: string
+          type: Database["public"]["Enums"]["goal_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          frequency?: string | null
+          id?: string
+          is_active?: boolean
+          start_date?: string
+          target_count?: number
+          title: string
+          type: Database["public"]["Enums"]["goal_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          frequency?: string | null
+          id?: string
+          is_active?: boolean
+          start_date?: string
+          target_count?: number
+          title?: string
+          type?: Database["public"]["Enums"]["goal_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      current_goal_progress: {
+        Row: {
+          completion_percentage: number | null
+          created_at: string | null
+          current_progress: number | null
+          end_date: string | null
+          frequency: string | null
+          id: string | null
+          is_active: boolean | null
+          start_date: string | null
+          target_count: number | null
+          title: string | null
+          type: Database["public"]["Enums"]["goal_type"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      goal_history: {
+        Row: {
+          completed_count: number | null
+          completion_percentage: number | null
+          end_date: string | null
+          frequency: string | null
+          goal_id: string | null
+          is_active: boolean | null
+          period: string | null
+          progress_created_at: string | null
+          progress_updated_at: string | null
+          start_date: string | null
+          target_count: number | null
+          title: string | null
+          type: Database["public"]["Enums"]["goal_type"] | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      get_current_period: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      increment_goal_progress: {
+        Args: { goal_uuid: string; increment_by?: number }
+        Returns: {
+          completed_count: number
+          created_at: string
+          goal_id: string
+          id: string
+          period: string
+          updated_at: string
+        }
+      }
+      initialize_monthly_progress: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      goal_type: "one_time" | "recurring"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +294,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      goal_type: ["one_time", "recurring"],
+    },
   },
 } as const
