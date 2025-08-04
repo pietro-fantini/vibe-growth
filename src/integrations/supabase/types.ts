@@ -228,6 +228,10 @@ export type Database = {
         Args: { subgoal_uuid: string; decrement_by?: number }
         Returns: undefined
       }
+      delete_subgoal_and_recalculate: {
+        Args: { subgoal_uuid: string }
+        Returns: undefined
+      }
       get_current_period: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -257,6 +261,10 @@ export type Database = {
       }
       initialize_monthly_progress: {
         Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      recalculate_goal_progress: {
+        Args: { goal_uuid: string }
         Returns: undefined
       }
     }

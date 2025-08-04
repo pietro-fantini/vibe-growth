@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Edit2, Plus, Check, X, LogOut, Target, Loader2, Minus, ChevronDown, ChevronRight } from "lucide-react";
+import { Trash2, Edit2, Plus, Check, X, LogOut, Target, Loader2, Minus, ChevronDown, ChevronRight, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,7 @@ interface Goal {
   is_active: boolean;
   current_progress?: number;
   completion_percentage?: number;
+  background_color?: string;
   subgoals?: Subgoal[];
 }
 
@@ -34,6 +35,8 @@ interface Subgoal {
   is_active: boolean;
   current_progress?: number;
   completion_percentage?: number;
+  progress?: number;
+  target?: number;
 }
 
 const Index = () => {
@@ -43,9 +46,11 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [editingGoal, setEditingGoal] = useState<string | null>(null);
   const [editingSubgoals, setEditingSubgoals] = useState<string | null>(null);
+  const [editingGoalSettings, setEditingGoalSettings] = useState<string | null>(null);
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalText, setNewGoalText] = useState("");
   const [newGoalTarget, setNewGoalTarget] = useState("5");
+  const [newGoalColor, setNewGoalColor] = useState("#6366f1");
   const [newSubgoalText, setNewSubgoalText] = useState("");
   const [newSubgoalType, setNewSubgoalType] = useState<'one_time' | 'recurring'>('one_time');
   const [newSubgoalTarget, setNewSubgoalTarget] = useState("1");
@@ -100,6 +105,8 @@ const Index = () => {
           return {
             ...subgoal,
             current_progress: subgoalProgress?.completed_count || 0,
+            progress: subgoalProgress?.completed_count || 0,
+            target: subgoal.target_count,
             completion_percentage: subgoal.target_count > 0 
               ? Math.min(((subgoalProgress?.completed_count || 0) / subgoal.target_count) * 100, 100)
               : 0
@@ -233,6 +240,35 @@ const Index = () => {
     }
   };
 
+  const updateGoalSettings = async (goalId: string, updates: { title?: string; target_count?: number; background_color?: string }) => {
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .update(updates)
+        .eq('id', goalId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      await fetchGoals();
+      setEditingGoalSettings(null);
+      setNewGoalTitle("");
+      setNewGoalTarget("");
+      setNewGoalColor("#6366f1");
+      
+      toast({
+        description: "✨ Goal updated successfully!",
+      });
+    } catch (error) {
+      console.error('Error updating goal:', error);
+      toast({
+        title: "Error updating goal",
+        description: "Failed to update goal. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -289,11 +325,9 @@ const Index = () => {
 
   const deleteSubgoal = async (subgoalId: string) => {
     try {
-      const { error } = await supabase
-        .from('subgoals')
-        .update({ is_active: false })
-        .eq('id', subgoalId)
-        .eq('user_id', user?.id);
+      const { error } = await supabase.rpc('delete_subgoal_and_recalculate', {
+        subgoal_uuid: subgoalId
+      });
 
       if (error) throw error;
 
@@ -429,7 +463,14 @@ const Index = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {goals.map((goal) => (
-              <Card key={goal.id} className="bg-gradient-card shadow-card border-0 hover:shadow-primary transition-smooth">
+              <Card 
+                key={goal.id} 
+                className="bg-gradient-card shadow-card border-0 hover:shadow-primary transition-smooth"
+                style={{ 
+                  backgroundColor: goal.background_color ? `${goal.background_color}15` : undefined,
+                  borderColor: goal.background_color || undefined
+                }}
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -469,9 +510,12 @@ const Index = () => {
                             size="sm"
                             variant="ghost"
                             onClick={() => {
-                              setEditingGoal(goal.id);
+                              setEditingGoalSettings(goal.id);
                               setNewGoalTitle(goal.title);
+                              setNewGoalTarget(goal.target_count.toString());
+                              setNewGoalColor(goal.background_color || "#6366f1");
                             }}
+                            title="Edit goal settings"
                           >
                             <Edit2 className="h-3 w-3" />
                           </Button>
@@ -483,10 +527,69 @@ const Index = () => {
                       variant="ghost"
                       onClick={() => deleteGoal(goal.id)}
                       className="text-destructive hover:text-destructive"
+                      title="Delete goal"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+
+                  {editingGoalSettings === goal.id && (
+                    <div className="space-y-4 mt-4 p-4 border border-border rounded-md bg-muted/10">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Goal Title</label>
+                        <Input
+                          type="text"
+                          value={newGoalTitle}
+                          onChange={(e) => setNewGoalTitle(e.target.value)}
+                          className="w-full"
+                          placeholder="Enter goal title"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Target</label>
+                        <Input
+                          type="number"
+                          value={newGoalTarget}
+                          onChange={(e) => setNewGoalTarget(e.target.value)}
+                          className="w-full"
+                          placeholder="Enter target count"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Background Color</label>
+                        <Input
+                          type="color"
+                          value={newGoalColor}
+                          onChange={(e) => setNewGoalColor(e.target.value)}
+                          className="w-full h-10"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => updateGoalSettings(goal.id, {
+                            title: newGoalTitle,
+                            target_count: parseInt(newGoalTarget) || goal.target_count,
+                            background_color: newGoalColor
+                          })}
+                        >
+                          Save Changes
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingGoalSettings(null);
+                            setNewGoalTitle("");
+                            setNewGoalTarget("");
+                            setNewGoalColor("#6366f1");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -546,7 +649,6 @@ const Index = () => {
                                 <SelectItem value="recurring">Recurring (monthly)</SelectItem>
                               </SelectContent>
                             </Select>
-                            {newSubgoalType === 'one_time' && (
                             <Input
                               type="number"
                               placeholder="Target"
@@ -555,17 +657,6 @@ const Index = () => {
                               className="w-20"
                               min="1"
                             />
-                          )}
-                          {newSubgoalType === 'recurring' && (
-                            <Input
-                              type="number"
-                              placeholder="Target"
-                              value={newSubgoalTarget}
-                              onChange={(e) => setNewSubgoalTarget(e.target.value)}
-                              className="w-20"
-                              min="1"
-                            />
-                          )}
                           </div>
                           <div className="flex gap-2">
                             <Button size="sm" onClick={() => addSubgoal(goal.id)} disabled={!newSubgoalText.trim()}>
@@ -587,7 +678,12 @@ const Index = () => {
                           {goal.subgoals.map((subgoal) => (
                              <div key={subgoal.id} className="p-2 bg-muted/20 rounded">
                                <div className="flex items-center gap-2 mb-2">
-                                 <span className="text-sm">{subgoal.title}</span>
+                                 <div className="flex items-center gap-2">
+                                   <span className="text-sm">{subgoal.title}</span>
+                                   {(subgoal.progress || 0) >= (subgoal.target || subgoal.target_count) && (
+                                     <CheckCircle2 className="h-4 w-4 text-success" />
+                                   )}
+                                 </div>
                                  <Badge variant={subgoal.type === 'recurring' ? 'default' : 'secondary'} className="text-xs">
                                    {subgoal.type === 'recurring' ? 'Monthly' : 'One-time'}
                                  </Badge>
