@@ -422,7 +422,7 @@ const Index = () => {
       <div className="container mx-auto py-8 space-y-8">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <div className="text-center space-y-2 flex-1">
+          <div className="flex-1">
             <div className="flex justify-center items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center shadow-primary">
                 <Target className="w-5 h-5 text-primary-foreground" />
@@ -444,7 +444,7 @@ const Index = () => {
         </div>
 
         {/* Add New Goal */}
-        <div className="flex justify-center">
+        <div className="flex justify-end">
           <Dialog open={showAddGoalDialog} onOpenChange={setShowAddGoalDialog}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-primary hover:shadow-primary transition-smooth">
@@ -738,7 +738,7 @@ const Index = () => {
                       {goal.subgoals && goal.subgoals.length > 0 ? (
                         <div className="space-y-2">
                            {goal.subgoals.map((subgoal) => (
-                              <div key={subgoal.id} className="p-2 bg-muted/20 rounded">
+                              <div key={subgoal.id} className="p-2 bg-card rounded border">
                                 <div className="flex items-center gap-2 mb-2">
                                   <div className="flex items-center gap-2">
                                     {editingSubgoal === subgoal.id ? (
