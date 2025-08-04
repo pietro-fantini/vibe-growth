@@ -138,6 +138,7 @@ export type Database = {
           goal_id: string
           id: string
           is_active: boolean
+          target_count: number
           title: string
           type: Database["public"]["Enums"]["goal_type"]
           updated_at: string
@@ -148,6 +149,7 @@ export type Database = {
           goal_id: string
           id?: string
           is_active?: boolean
+          target_count?: number
           title: string
           type: Database["public"]["Enums"]["goal_type"]
           updated_at?: string
@@ -158,6 +160,7 @@ export type Database = {
           goal_id?: string
           id?: string
           is_active?: boolean
+          target_count?: number
           title?: string
           type?: Database["public"]["Enums"]["goal_type"]
           updated_at?: string
@@ -228,6 +231,14 @@ export type Database = {
       get_current_period: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      handle_subgoal_completion: {
+        Args: { subgoal_uuid: string; increment_by?: number }
+        Returns: undefined
+      }
+      handle_subgoal_decrement: {
+        Args: { subgoal_uuid: string; decrement_by?: number }
+        Returns: undefined
       }
       increment_goal_progress: {
         Args: { goal_uuid: string; increment_by?: number }
