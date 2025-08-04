@@ -428,12 +428,9 @@ const Index = () => {
                 <Target className="w-5 h-5 text-primary-foreground" />
               </div>
               <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Goal Tracker
+                Hurry Up!
               </h1>
             </div>
-            <p className="text-lg text-muted-foreground">
-              Welcome back, {user?.email}! Track your progress and achieve your goals.
-            </p>
           </div>
           <Button 
             onClick={handleSignOut}
@@ -533,8 +530,7 @@ const Index = () => {
                 key={goal.id} 
                 className="shadow-card border-0 hover:shadow-primary transition-smooth"
                 style={{ 
-                  backgroundColor: goal.background_color || 'hsl(var(--card))',
-                  borderColor: goal.background_color || undefined
+                  backgroundColor: goal.background_color || 'hsl(var(--card))'
                 }}
               >
                 <CardHeader className="pb-3">
