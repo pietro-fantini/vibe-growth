@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Edit2, Plus, Check, X, LogOut, Target, Loader2 } from "lucide-react";
+import { Trash2, Edit2, Plus, Check, X, LogOut, Target, Loader2, Minus, ChevronDown, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +21,18 @@ interface Goal {
   is_active: boolean;
   current_progress?: number;
   completion_percentage?: number;
+  subgoals?: Subgoal[];
+}
+
+interface Subgoal {
+  id: string;
+  goal_id: string;
+  title: string;
+  type: 'one_time' | 'recurring';
+  user_id: string;
+  is_active: boolean;
+  current_progress?: number;
+  completion_percentage?: number;
 }
 
 const Index = () => {
@@ -27,9 +41,12 @@ const Index = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingGoal, setEditingGoal] = useState<string | null>(null);
+  const [editingSubgoals, setEditingSubgoals] = useState<string | null>(null);
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalText, setNewGoalText] = useState("");
-  const [newGoalTarget, setNewGoalTarget] = useState("1");
+  const [newGoalTarget, setNewGoalTarget] = useState("5");
+  const [newSubgoalText, setNewSubgoalText] = useState("");
+  const [newSubgoalType, setNewSubgoalType] = useState<'one_time' | 'recurring'>('one_time');
 
   useEffect(() => {
     if (user) {
@@ -57,13 +74,23 @@ const Index = () => {
 
       if (progressError) throw progressError;
 
-      // Merge goals with their progress
+      // Fetch subgoals for each goal
+      const { data: subgoalsData, error: subgoalsError } = await supabase
+        .from('current_subgoal_progress')
+        .select('*')
+        .eq('user_id', user?.id);
+
+      if (subgoalsError) throw subgoalsError;
+
+      // Merge goals with their progress and subgoals
       const goalsWithProgress = goalsData.map(goal => {
         const progress = progressData.find(p => p.id === goal.id);
+        const goalSubgoals = subgoalsData.filter(s => s.goal_id === goal.id);
         return {
           ...goal,
           current_progress: progress?.current_progress || 0,
-          completion_percentage: progress?.completion_percentage || 0
+          completion_percentage: progress?.completion_percentage || 0,
+          subgoals: goalSubgoals
         };
       });
 
@@ -114,7 +141,7 @@ const Index = () => {
         .insert({
           title: newGoalText.trim(),
           type: 'one_time',
-          target_count: parseInt(newGoalTarget) || 1,
+          target_count: parseInt(newGoalTarget) || 5,
           user_id: user.id
         });
 
@@ -122,7 +149,7 @@ const Index = () => {
 
       await fetchGoals();
       setNewGoalText("");
-      setNewGoalTarget("1");
+      setNewGoalTarget("5");
       
       toast({
         description: `✨ New goal "${newGoalText.trim()}" added!`,
@@ -202,6 +229,64 @@ const Index = () => {
     }
   };
 
+  const addSubgoal = async (goalId: string) => {
+    if (!newSubgoalText.trim() || !user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('subgoals')
+        .insert({
+          goal_id: goalId,
+          title: newSubgoalText.trim(),
+          type: newSubgoalType,
+          user_id: user.id
+        });
+
+      if (error) throw error;
+
+      await fetchGoals();
+      setNewSubgoalText("");
+      setNewSubgoalType('one_time');
+      setEditingSubgoals(null);
+      
+      toast({
+        description: `✨ Subgoal "${newSubgoalText.trim()}" added!`,
+      });
+    } catch (error) {
+      console.error('Error adding subgoal:', error);
+      toast({
+        title: "Error adding subgoal",
+        description: "Failed to add subgoal. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSubgoalProgress = async (subgoalId: string, increment: boolean = true) => {
+    try {
+      const functionName = increment ? 'increment_subgoal_progress' : 'decrement_subgoal_progress';
+      const { error } = await supabase.rpc(functionName, {
+        subgoal_uuid: subgoalId,
+        [increment ? 'increment_by' : 'decrement_by']: 1
+      });
+
+      if (error) throw error;
+
+      await fetchGoals();
+      
+      toast({
+        description: increment ? "✅ Progress added!" : "↩️ Progress removed!",
+      });
+    } catch (error) {
+      console.error('Error updating subgoal progress:', error);
+      toast({
+        title: "Error updating progress",
+        description: "Failed to update subgoal progress. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-primary/5 flex items-center justify-center">
@@ -261,14 +346,15 @@ const Index = () => {
                 }}
                 className="flex-1"
               />
-              <Input
-                type="number"
-                placeholder="Target"
-                value={newGoalTarget}
-                onChange={(e) => setNewGoalTarget(e.target.value)}
-                className="w-20"
-                min="1"
-              />
+                <Input
+                  type="number"
+                  placeholder="Target"
+                  value={newGoalTarget}
+                  onChange={(e) => setNewGoalTarget(e.target.value)}
+                  className="w-20"
+                  min="1"
+                  disabled
+                />
               <Button 
                 onClick={addGoal} 
                 disabled={!newGoalText.trim()}
@@ -384,6 +470,101 @@ const Index = () => {
                         🎉 Goal Completed!
                       </Badge>
                     )}
+
+                    {/* Subgoals Section */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold">Subgoals</h4>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingSubgoals(editingSubgoals === goal.id ? null : goal.id)}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add Subgoal
+                        </Button>
+                      </div>
+
+                      {editingSubgoals === goal.id && (
+                        <div className="space-y-3 mb-4 p-3 bg-muted/30 rounded-lg">
+                          <Input
+                            placeholder="Subgoal title"
+                            value={newSubgoalText}
+                            onChange={(e) => setNewSubgoalText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') addSubgoal(goal.id);
+                              if (e.key === 'Escape') {
+                                setEditingSubgoals(null);
+                                setNewSubgoalText("");
+                              }
+                            }}
+                          />
+                          <Select value={newSubgoalType} onValueChange={(value: 'one_time' | 'recurring') => setNewSubgoalType(value)}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="one_time">One-time</SelectItem>
+                              <SelectItem value="recurring">Recurring (monthly)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => addSubgoal(goal.id)} disabled={!newSubgoalText.trim()}>
+                              Add Subgoal
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => {
+                              setEditingSubgoals(null);
+                              setNewSubgoalText("");
+                            }}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {goal.subgoals && goal.subgoals.length > 0 ? (
+                        <div className="space-y-2">
+                          {goal.subgoals.map((subgoal) => (
+                            <div key={subgoal.id} className="flex items-center justify-between p-2 bg-muted/20 rounded">
+                              <div className="flex items-center gap-2 flex-1">
+                                <span className="text-sm">{subgoal.title}</span>
+                                <Badge variant={subgoal.type === 'recurring' ? 'default' : 'secondary'} className="text-xs">
+                                  {subgoal.type === 'recurring' ? 'Monthly' : 'One-time'}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {subgoal.current_progress || 0}/{subgoal.type === 'one_time' ? 1 : 5}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleSubgoalProgress(subgoal.id, false)}
+                                  disabled={(subgoal.current_progress || 0) <= 0}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSubgoalProgress(subgoal.id, true)}
+                                  disabled={
+                                    subgoal.type === 'one_time' 
+                                      ? (subgoal.current_progress || 0) >= 1
+                                      : (subgoal.current_progress || 0) >= 5
+                                  }
+                                  className="h-6 w-6 p-0 bg-gradient-success"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No subgoals yet</p>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

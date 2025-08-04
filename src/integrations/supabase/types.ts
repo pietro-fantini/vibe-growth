@@ -105,6 +105,66 @@ export type Database = {
         }
         Relationships: []
       }
+      subgoal_progress: {
+        Row: {
+          completed_count: number
+          created_at: string
+          id: string
+          period: string
+          subgoal_id: string
+          updated_at: string
+        }
+        Insert: {
+          completed_count?: number
+          created_at?: string
+          id?: string
+          period: string
+          subgoal_id: string
+          updated_at?: string
+        }
+        Update: {
+          completed_count?: number
+          created_at?: string
+          id?: string
+          period?: string
+          subgoal_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subgoals: {
+        Row: {
+          created_at: string
+          goal_id: string
+          id: string
+          is_active: boolean
+          title: string
+          type: Database["public"]["Enums"]["goal_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          goal_id: string
+          id?: string
+          is_active?: boolean
+          title: string
+          type: Database["public"]["Enums"]["goal_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          goal_id?: string
+          id?: string
+          is_active?: boolean
+          title?: string
+          type?: Database["public"]["Enums"]["goal_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       current_goal_progress: {
@@ -118,6 +178,21 @@ export type Database = {
           is_active: boolean | null
           start_date: string | null
           target_count: number | null
+          title: string | null
+          type: Database["public"]["Enums"]["goal_type"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      current_subgoal_progress: {
+        Row: {
+          completion_percentage: number | null
+          created_at: string | null
+          current_progress: number | null
+          goal_id: string | null
+          id: string | null
+          is_active: boolean | null
           title: string | null
           type: Database["public"]["Enums"]["goal_type"] | null
           updated_at: string | null
@@ -146,6 +221,10 @@ export type Database = {
       }
     }
     Functions: {
+      decrement_subgoal_progress: {
+        Args: { subgoal_uuid: string; decrement_by?: number }
+        Returns: undefined
+      }
       get_current_period: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -160,6 +239,10 @@ export type Database = {
           period: string
           updated_at: string
         }
+      }
+      increment_subgoal_progress: {
+        Args: { subgoal_uuid: string; increment_by?: number }
+        Returns: undefined
       }
       initialize_monthly_progress: {
         Args: Record<PropertyKey, never>
