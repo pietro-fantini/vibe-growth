@@ -1,370 +1,395 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Brain, Code, Dumbbell, Camera, Plus, Minus, Edit2, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Trash2, Edit2, Plus, Check, X, LogOut, Target, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
-interface SubGoal {
+interface Goal {
   id: string;
   title: string;
-  completed: boolean;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  icon: React.ReactNode;
-  color: string;
-  subGoals: SubGoal[];
+  type: 'one_time' | 'recurring';
+  target_count: number;
+  user_id: string;
+  is_active: boolean;
+  current_progress?: number;
+  completion_percentage?: number;
 }
 
 const Index = () => {
   const { toast } = useToast();
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
-  const [editingSubGoal, setEditingSubGoal] = useState<string | null>(null);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newSubGoalTitle, setNewSubGoalTitle] = useState("");
+  const { user, signOut } = useAuth();
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingGoal, setEditingGoal] = useState<string | null>(null);
+  const [newGoalTitle, setNewGoalTitle] = useState("");
+  const [newGoalText, setNewGoalText] = useState("");
+  const [newGoalTarget, setNewGoalTarget] = useState("1");
 
-  const [categories, setCategories] = useState<Category[]>([
-    {
-      id: "ai-tools",
-      name: "AI Tools",
-      icon: <Brain className="h-6 w-6" />,
-      color: "bg-primary/10 text-primary border-primary/20",
-      subGoals: [
-        { id: "1", title: "Try ChatGPT for coding", completed: true },
-        { id: "2", title: "Test Midjourney", completed: true },
-        { id: "3", title: "Explore Claude", completed: false },
-        { id: "4", title: "Try GitHub Copilot", completed: false },
-        { id: "5", title: "Test Notion AI", completed: false },
-      ]
-    },
-    {
-      id: "side-projects",
-      name: "Side Projects",
-      icon: <Code className="h-6 w-6" />,
-      color: "bg-progress/10 text-progress border-progress/20",
-      subGoals: [
-        { id: "6", title: "Portfolio website", completed: true },
-        { id: "7", title: "Weather app", completed: false },
-        { id: "8", title: "Task manager", completed: false },
-      ]
-    },
-    {
-      id: "fitness",
-      name: "Fitness",
-      icon: <Dumbbell className="h-6 w-6" />,
-      color: "bg-success/10 text-success border-success/20",
-      subGoals: [
-        { id: "9", title: "Monday workout", completed: true },
-        { id: "10", title: "Wednesday workout", completed: true },
-        { id: "11", title: "Friday workout", completed: true },
-        { id: "12", title: "Sunday workout", completed: false },
-      ]
-    },
-    {
-      id: "content",
-      name: "Content Creation",
-      icon: <Camera className="h-6 w-6" />,
-      color: "bg-warning/10 text-warning border-warning/20",
-      subGoals: [
-        { id: "13", title: "Blog post about AI", completed: true },
-        { id: "14", title: "YouTube video", completed: false },
-        { id: "15", title: "Twitter thread", completed: false },
-        { id: "16", title: "LinkedIn article", completed: false },
-      ]
-    },
-  ]);
+  useEffect(() => {
+    if (user) {
+      fetchGoals();
+    }
+  }, [user]);
 
-  const getCompletionPercentage = (subGoals: SubGoal[]) => {
-    if (subGoals.length === 0) return 0;
-    const completed = subGoals.filter(goal => goal.completed).length;
-    return Math.round((completed / subGoals.length) * 100);
-  };
+  const fetchGoals = async () => {
+    try {
+      setLoading(true);
+      const { data: goalsData, error: goalsError } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
 
-  const handleSubGoalToggle = (categoryId: string, subGoalId: string, increment: boolean) => {
-    setCategories(prev => prev.map(category => {
-      if (category.id === categoryId) {
+      if (goalsError) throw goalsError;
+
+      // Fetch current progress for each goal
+      const { data: progressData, error: progressError } = await supabase
+        .from('current_goal_progress')
+        .select('*')
+        .eq('user_id', user?.id);
+
+      if (progressError) throw progressError;
+
+      // Merge goals with their progress
+      const goalsWithProgress = goalsData.map(goal => {
+        const progress = progressData.find(p => p.id === goal.id);
         return {
-          ...category,
-          subGoals: category.subGoals.map(subGoal => {
-            if (subGoal.id === subGoalId) {
-              return { ...subGoal, completed: increment };
-            }
-            return subGoal;
-          })
+          ...goal,
+          current_progress: progress?.current_progress || 0,
+          completion_percentage: progress?.completion_percentage || 0
         };
-      }
-      return category;
-    }));
+      });
 
-    toast({
-      title: increment ? "Progress added!" : "Progress removed",
-      description: increment ? "Great job on completing this goal!" : "Goal marked as incomplete",
-    });
+      setGoals(goalsWithProgress);
+    } catch (error) {
+      console.error('Error fetching goals:', error);
+      toast({
+        title: "Error loading goals",
+        description: "Failed to load your goals. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addSubGoal = (categoryId: string) => {
-    if (!newSubGoalTitle.trim()) return;
+  const handleGoalProgress = async (goalId: string) => {
+    try {
+      const { error } = await supabase.rpc('increment_goal_progress', {
+        goal_uuid: goalId,
+        increment_by: 1
+      });
 
-    const newSubGoal: SubGoal = {
-      id: Date.now().toString(),
-      title: newSubGoalTitle,
-      completed: false
-    };
+      if (error) throw error;
 
-    setCategories(prev => prev.map(category => {
-      if (category.id === categoryId) {
-        return {
-          ...category,
-          subGoals: [...category.subGoals, newSubGoal]
-        };
-      }
-      return category;
-    }));
-
-    setNewSubGoalTitle("");
-    toast({
-      title: "Sub-goal added!",
-      description: "New sub-goal has been created",
-    });
+      // Refresh goals to get updated progress
+      await fetchGoals();
+      
+      toast({
+        description: "✅ Great job! Progress updated!",
+      });
+    } catch (error) {
+      console.error('Error updating progress:', error);
+      toast({
+        title: "Error updating progress",
+        description: "Failed to update goal progress. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const deleteSubGoal = (categoryId: string, subGoalId: string) => {
-    setCategories(prev => prev.map(category => {
-      if (category.id === categoryId) {
-        return {
-          ...category,
-          subGoals: category.subGoals.filter(subGoal => subGoal.id !== subGoalId)
-        };
-      }
-      return category;
-    }));
+  const addGoal = async () => {
+    if (!newGoalText.trim() || !user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .insert({
+          title: newGoalText.trim(),
+          type: 'one_time',
+          target_count: parseInt(newGoalTarget) || 1,
+          user_id: user.id
+        });
 
-    toast({
-      title: "Sub-goal deleted",
-      description: "Sub-goal has been removed",
-    });
+      if (error) throw error;
+
+      await fetchGoals();
+      setNewGoalText("");
+      setNewGoalTarget("1");
+      
+      toast({
+        description: `✨ New goal "${newGoalText.trim()}" added!`,
+      });
+    } catch (error) {
+      console.error('Error adding goal:', error);
+      toast({
+        title: "Error adding goal",
+        description: "Failed to add goal. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const updateCategoryName = (categoryId: string) => {
-    if (!newCategoryName.trim()) return;
+  const deleteGoal = async (goalId: string) => {
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .update({ is_active: false })
+        .eq('id', goalId)
+        .eq('user_id', user?.id);
 
-    setCategories(prev => prev.map(category => {
-      if (category.id === categoryId) {
-        return { ...category, name: newCategoryName };
-      }
-      return category;
-    }));
+      if (error) throw error;
 
-    setEditingCategory(null);
-    setNewCategoryName("");
-    toast({
-      title: "Category updated!",
-      description: "Category name has been changed",
-    });
+      await fetchGoals();
+      
+      toast({
+        description: "🗑️ Goal deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+      toast({
+        title: "Error deleting goal",
+        description: "Failed to delete goal. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const updateSubGoalTitle = (categoryId: string, subGoalId: string) => {
-    if (!newSubGoalTitle.trim()) return;
+  const updateGoalTitle = async (goalId: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .update({ title: newTitle.trim() })
+        .eq('id', goalId)
+        .eq('user_id', user?.id);
 
-    setCategories(prev => prev.map(category => {
-      if (category.id === categoryId) {
-        return {
-          ...category,
-          subGoals: category.subGoals.map(subGoal => {
-            if (subGoal.id === subGoalId) {
-              return { ...subGoal, title: newSubGoalTitle };
-            }
-            return subGoal;
-          })
-        };
-      }
-      return category;
-    }));
+      if (error) throw error;
 
-    setEditingSubGoal(null);
-    setNewSubGoalTitle("");
-    toast({
-      title: "Sub-goal updated!",
-      description: "Sub-goal title has been changed",
-    });
+      await fetchGoals();
+      setEditingGoal(null);
+      setNewGoalTitle("");
+    } catch (error) {
+      console.error('Error updating goal:', error);
+      toast({
+        title: "Error updating goal",
+        description: "Failed to update goal. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        description: "👋 Signed out successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error signing out",
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-primary/5 flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading your goals...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-primary/5">
       <div className="container mx-auto py-8 space-y-8">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Goal Tracker
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            Track your progress across different areas of your life
-          </p>
+        <div className="flex justify-between items-center">
+          <div className="text-center space-y-2 flex-1">
+            <div className="flex justify-center items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center shadow-primary">
+                <Target className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                Goal Tracker
+              </h1>
+            </div>
+            <p className="text-lg text-muted-foreground">
+              Welcome back, {user?.email}! Track your progress and achieve your goals.
+            </p>
+          </div>
+          <Button 
+            onClick={handleSignOut}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </Button>
         </div>
 
-        {/* Category Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {categories.map((category) => {
-            const completionPercentage = getCompletionPercentage(category.subGoals);
-            const completedCount = category.subGoals.filter(goal => goal.completed).length;
+        {/* Add New Goal */}
+        <Card className="bg-gradient-card shadow-card border-0">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Add New Goal
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3">
+              <Input
+                placeholder="What's your goal?"
+                value={newGoalText}
+                onChange={(e) => setNewGoalText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') addGoal();
+                }}
+                className="flex-1"
+              />
+              <Input
+                type="number"
+                placeholder="Target"
+                value={newGoalTarget}
+                onChange={(e) => setNewGoalTarget(e.target.value)}
+                className="w-20"
+                min="1"
+              />
+              <Button 
+                onClick={addGoal} 
+                disabled={!newGoalText.trim()}
+                className="bg-gradient-primary hover:shadow-primary transition-smooth"
+              >
+                Add Goal
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-            return (
-              <Dialog key={category.id}>
-                <DialogTrigger asChild>
-                  <Card className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 hover:border-primary/50">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-3 rounded-lg ${category.color}`}>
-                            {category.icon}
-                          </div>
-                          <div>
-                            {editingCategory === category.id ? (
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  value={newCategoryName}
-                                  onChange={(e) => setNewCategoryName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') updateCategoryName(category.id);
-                                    if (e.key === 'Escape') {
-                                      setEditingCategory(null);
-                                      setNewCategoryName("");
-                                    }
-                                  }}
-                                  className="h-8 w-32"
-                                  autoFocus
-                                />
-                                <Button size="sm" onClick={() => updateCategoryName(category.id)}>
-                                  Save
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <CardTitle className="text-xl">{category.name}</CardTitle>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingCategory(category.id);
-                                    setNewCategoryName(category.name);
-                                  }}
-                                >
-                                  <Edit2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold">{completionPercentage}%</div>
-                          <div className="text-sm text-muted-foreground">
-                            {completedCount}/{category.subGoals.length} completed
-                          </div>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <Progress value={completionPercentage} className="h-3" />
-                    </CardContent>
-                  </Card>
-                </DialogTrigger>
-
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${category.color}`}>
-                        {category.icon}
-                      </div>
-                      {category.name} Goals
-                    </DialogTitle>
-                  </DialogHeader>
-
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {category.subGoals.map((subGoal) => (
-                      <div key={subGoal.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div className="flex-1">
-                          {editingSubGoal === subGoal.id ? (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                value={newSubGoalTitle}
-                                onChange={(e) => setNewSubGoalTitle(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') updateSubGoalTitle(category.id, subGoal.id);
-                                  if (e.key === 'Escape') {
-                                    setEditingSubGoal(null);
-                                    setNewSubGoalTitle("");
-                                  }
-                                }}
-                                className="h-8"
-                                autoFocus
-                              />
-                              <Button size="sm" onClick={() => updateSubGoalTitle(category.id, subGoal.id)}>
-                                Save
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className={`font-medium ${subGoal.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                {subGoal.title}
-                              </span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingSubGoal(subGoal.id);
-                                  setNewSubGoalTitle(subGoal.title);
-                                }}
-                              >
-                                <Edit2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 ml-2">
-                          <Button
-                            size="sm"
-                            variant={subGoal.completed ? "default" : "outline"}
-                            onClick={() => handleSubGoalToggle(category.id, subGoal.id, !subGoal.completed)}
-                          >
-                            {subGoal.completed ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+        {/* Goals Grid */}
+        {goals.length === 0 ? (
+          <Card className="bg-gradient-card shadow-card border-0">
+            <CardContent className="text-center py-12">
+              <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No goals yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Start by adding your first goal above. Every journey begins with a single step!
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {goals.map((goal) => (
+              <Card key={goal.id} className="bg-gradient-card shadow-card border-0 hover:shadow-primary transition-smooth">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      {editingGoal === goal.id ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={newGoalTitle}
+                            onChange={(e) => setNewGoalTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') updateGoalTitle(goal.id, newGoalTitle);
+                              if (e.key === 'Escape') {
+                                setEditingGoal(null);
+                                setNewGoalTitle("");
+                              }
+                            }}
+                            className="h-8"
+                            autoFocus
+                          />
+                          <Button size="sm" onClick={() => updateGoalTitle(goal.id, newGoalTitle)}>
+                            <Check className="h-3 w-3" />
                           </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => {
+                              setEditingGoal(null);
+                              setNewGoalTitle("");
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">{goal.title}</CardTitle>
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => deleteSubGoal(category.id, subGoal.id)}
+                            onClick={() => {
+                              setEditingGoal(goal.id);
+                              setNewGoalTitle(goal.title);
+                            }}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Edit2 className="h-3 w-3" />
                           </Button>
                         </div>
-                      </div>
-                    ))}
-
-                    {/* Add new sub-goal */}
-                    <div className="flex items-center gap-2 p-3 border-2 border-dashed border-muted-foreground/20 rounded-lg">
-                      <Input
-                        placeholder="Add new sub-goal..."
-                        value={newSubGoalTitle}
-                        onChange={(e) => setNewSubGoalTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') addSubGoal(category.id);
-                        }}
-                      />
-                      <Button onClick={() => addSubGoal(category.id)} disabled={!newSubGoalTitle.trim()}>
-                        <Plus className="h-4 w-4" />
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deleteGoal(goal.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Progress</span>
+                      <Badge variant="secondary">
+                        {goal.current_progress || 0} / {goal.target_count}
+                      </Badge>
+                    </div>
+                    <Progress 
+                      value={goal.completion_percentage || 0} 
+                      className="h-3"
+                    />
+                    <div className="flex justify-between items-center">
+                      <span className="text-2xl font-bold text-primary">
+                        {Math.round(goal.completion_percentage || 0)}%
+                      </span>
+                      <Button
+                        onClick={() => handleGoalProgress(goal.id)}
+                        disabled={(goal.current_progress || 0) >= goal.target_count}
+                        className="bg-gradient-success hover:shadow-primary transition-smooth"
+                        size="sm"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Progress
                       </Button>
                     </div>
+                    {(goal.current_progress || 0) >= goal.target_count && (
+                      <Badge className="w-full justify-center bg-gradient-success text-success-foreground">
+                        🎉 Goal Completed!
+                      </Badge>
+                    )}
                   </div>
-                </DialogContent>
-              </Dialog>
-            );
-          })}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
