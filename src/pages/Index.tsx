@@ -47,6 +47,7 @@ const Index = () => {
   const [newGoalTarget, setNewGoalTarget] = useState("5");
   const [newSubgoalText, setNewSubgoalText] = useState("");
   const [newSubgoalType, setNewSubgoalType] = useState<'one_time' | 'recurring'>('one_time');
+  const [newSubgoalTarget, setNewSubgoalTarget] = useState("1");
 
   useEffect(() => {
     if (user) {
@@ -247,6 +248,7 @@ const Index = () => {
       await fetchGoals();
       setNewSubgoalText("");
       setNewSubgoalType('one_time');
+      setNewSubgoalTarget("1");
       setEditingSubgoals(null);
       
       toast({
@@ -338,7 +340,7 @@ const Index = () => {
           <CardContent>
             <div className="flex gap-3">
               <Input
-                placeholder="What's your goal?"
+                placeholder="What's your goal? (add emoji at start if you want)"
                 value={newGoalText}
                 onChange={(e) => setNewGoalText(e.target.value)}
                 onKeyDown={(e) => {
@@ -353,7 +355,6 @@ const Index = () => {
                   onChange={(e) => setNewGoalTarget(e.target.value)}
                   className="w-20"
                   min="1"
-                  disabled
                 />
               <Button 
                 onClick={addGoal} 
@@ -441,29 +442,14 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Progress</span>
+                    <div className="flex items-center gap-3">
+                      <Progress 
+                        value={goal.completion_percentage || 0} 
+                        className="flex-1 h-3"
+                      />
                       <Badge variant="secondary">
                         {goal.current_progress || 0} / {goal.target_count}
                       </Badge>
-                    </div>
-                    <Progress 
-                      value={goal.completion_percentage || 0} 
-                      className="h-3"
-                    />
-                    <div className="flex justify-between items-center">
-                      <span className="text-2xl font-bold text-primary">
-                        {Math.round(goal.completion_percentage || 0)}%
-                      </span>
-                      <Button
-                        onClick={() => handleGoalProgress(goal.id)}
-                        disabled={(goal.current_progress || 0) >= goal.target_count}
-                        className="bg-gradient-success hover:shadow-primary transition-smooth"
-                        size="sm"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Progress
-                      </Button>
                     </div>
                     {(goal.current_progress || 0) >= goal.target_count && (
                       <Badge className="w-full justify-center bg-gradient-success text-success-foreground">
@@ -499,15 +485,27 @@ const Index = () => {
                               }
                             }}
                           />
-                          <Select value={newSubgoalType} onValueChange={(value: 'one_time' | 'recurring') => setNewSubgoalType(value)}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="one_time">One-time</SelectItem>
-                              <SelectItem value="recurring">Recurring (monthly)</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="flex gap-2">
+                            <Select value={newSubgoalType} onValueChange={(value: 'one_time' | 'recurring') => setNewSubgoalType(value)}>
+                              <SelectTrigger className="flex-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="one_time">One-time</SelectItem>
+                                <SelectItem value="recurring">Recurring (monthly)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {newSubgoalType === 'one_time' && (
+                              <Input
+                                type="number"
+                                placeholder="Target"
+                                value={newSubgoalTarget}
+                                onChange={(e) => setNewSubgoalTarget(e.target.value)}
+                                className="w-20"
+                                min="1"
+                              />
+                            )}
+                          </div>
                           <div className="flex gap-2">
                             <Button size="sm" onClick={() => addSubgoal(goal.id)} disabled={!newSubgoalText.trim()}>
                               Add Subgoal
@@ -515,6 +513,7 @@ const Index = () => {
                             <Button size="sm" variant="outline" onClick={() => {
                               setEditingSubgoals(null);
                               setNewSubgoalText("");
+                              setNewSubgoalTarget("1");
                             }}>
                               Cancel
                             </Button>
@@ -525,38 +524,42 @@ const Index = () => {
                       {goal.subgoals && goal.subgoals.length > 0 ? (
                         <div className="space-y-2">
                           {goal.subgoals.map((subgoal) => (
-                            <div key={subgoal.id} className="flex items-center justify-between p-2 bg-muted/20 rounded">
-                              <div className="flex items-center gap-2 flex-1">
+                            <div key={subgoal.id} className="p-2 bg-muted/20 rounded">
+                              <div className="flex items-center gap-2 mb-2">
                                 <span className="text-sm">{subgoal.title}</span>
                                 <Badge variant={subgoal.type === 'recurring' ? 'default' : 'secondary'} className="text-xs">
                                   {subgoal.type === 'recurring' ? 'Monthly' : 'One-time'}
                                 </Badge>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Progress 
+                                  value={subgoal.type === 'one_time' 
+                                    ? Math.min(((subgoal.current_progress || 0) / 1) * 100, 100)
+                                    : ((subgoal.current_progress || 0) / 5) * 100
+                                  } 
+                                  className="flex-1 h-2"
+                                />
                                 <Badge variant="outline" className="text-xs">
                                   {subgoal.current_progress || 0}/{subgoal.type === 'one_time' ? 1 : 5}
                                 </Badge>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleSubgoalProgress(subgoal.id, false)}
-                                  disabled={(subgoal.current_progress || 0) <= 0}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleSubgoalProgress(subgoal.id, true)}
-                                  disabled={
-                                    subgoal.type === 'one_time' 
-                                      ? (subgoal.current_progress || 0) >= 1
-                                      : (subgoal.current_progress || 0) >= 5
-                                  }
-                                  className="h-6 w-6 p-0 bg-gradient-success"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleSubgoalProgress(subgoal.id, false)}
+                                    disabled={(subgoal.current_progress || 0) <= 0}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSubgoalProgress(subgoal.id, true)}
+                                    className="h-6 w-6 p-0 bg-gradient-success"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           ))}
