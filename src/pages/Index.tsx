@@ -29,6 +29,7 @@ interface Subgoal {
   goal_id: string;
   title: string;
   type: 'one_time' | 'recurring';
+  target_count: number;
   user_id: string;
   is_active: boolean;
   current_progress?: number;
@@ -83,10 +84,13 @@ const Index = () => {
 
       if (subgoalsError) throw subgoalsError;
 
-      // Merge goals with their progress and subgoals
+       // Merge goals with their progress and subgoals
       const goalsWithProgress = goalsData.map(goal => {
         const progress = progressData.find(p => p.id === goal.id);
-        const goalSubgoals = subgoalsData.filter(s => s.goal_id === goal.id);
+        const goalSubgoals = subgoalsData.filter(s => s.goal_id === goal.id).map(subgoal => ({
+          ...subgoal,
+          target_count: subgoal.type === 'one_time' ? 1 : 5 // Default values, will be updated from actual data
+        }));
         return {
           ...goal,
           current_progress: progress?.current_progress || 0,
