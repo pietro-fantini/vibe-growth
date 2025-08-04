@@ -65,6 +65,7 @@ export type Database = {
       }
       goals: {
         Row: {
+          background_color: string | null
           created_at: string
           end_date: string | null
           frequency: string | null
@@ -78,6 +79,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          background_color?: string | null
           created_at?: string
           end_date?: string | null
           frequency?: string | null
@@ -91,6 +93,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          background_color?: string | null
           created_at?: string
           end_date?: string | null
           frequency?: string | null
