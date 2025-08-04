@@ -51,12 +51,21 @@ const Index = () => {
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalText, setNewGoalText] = useState("");
   const [newGoalTarget, setNewGoalTarget] = useState("5");
-  const [newGoalColor, setNewGoalColor] = useState("#6366f1");
+  const [newGoalColor, setNewGoalColor] = useState("#FFB3BA"); // Default to first pastel color
   const [showAddGoalDialog, setShowAddGoalDialog] = useState(false);
   const [newSubgoalText, setNewSubgoalText] = useState("");
   const [newSubgoalType, setNewSubgoalType] = useState<'one_time' | 'recurring'>('one_time');
   const [newSubgoalTarget, setNewSubgoalTarget] = useState("1");
   const [editingSubgoalTitle, setEditingSubgoalTitle] = useState("");
+
+  // Pastel color options
+  const pastelColors = [
+    "#FFB3BA", // Light pink
+    "#BAFFC9", // Light green
+    "#BAE1FF", // Light blue
+    "#FFFFBA", // Light yellow
+    "#FFDFBA"  // Light peach
+  ];
 
   useEffect(() => {
     if (user) {
@@ -180,7 +189,7 @@ const Index = () => {
       await fetchGoals();
       setNewGoalText("");
       setNewGoalTarget("5");
-      setNewGoalColor("#6366f1");
+      setNewGoalColor("#FFB3BA");
       setShowAddGoalDialog(false);
       
       toast({
@@ -260,7 +269,7 @@ const Index = () => {
       setEditingGoalSettings(null);
       setNewGoalTitle("");
       setNewGoalTarget("");
-      setNewGoalColor("#6366f1");
+      setNewGoalColor("#FFB3BA");
       
       toast({
         description: "✨ Goal updated successfully!",
@@ -421,9 +430,9 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-primary/5">
       <div className="container mx-auto py-8 space-y-8">
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <div className="flex-1">
-            <div className="flex justify-center items-center gap-3 mb-2">
+        <div className="relative flex items-center">
+          <div className="absolute inset-0 flex justify-center items-center">
+            <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center shadow-primary">
                 <Target className="w-5 h-5 text-primary-foreground" />
               </div>
@@ -432,15 +441,16 @@ const Index = () => {
               </h1>
             </div>
           </div>
-          <Button 
-            onClick={handleSignOut}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </Button>
+          <div className="ml-auto">
+            <Button 
+              onClick={handleSignOut}
+              variant="outline"
+              size="sm"
+              className="flex items-center"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Add New Goal */}
@@ -480,12 +490,21 @@ const Index = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Background Color</label>
-                  <Input
-                    type="color"
-                    value={newGoalColor}
-                    onChange={(e) => setNewGoalColor(e.target.value)}
-                    className="w-full h-10"
-                  />
+                  <div className="flex gap-2">
+                    {pastelColors.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${
+                          newGoalColor === color 
+                            ? 'border-primary scale-110' 
+                            : 'border-muted hover:border-primary/50'
+                        }`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setNewGoalColor(color)}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <Button
@@ -494,7 +513,7 @@ const Index = () => {
                       setShowAddGoalDialog(false);
                       setNewGoalText("");
                       setNewGoalTarget("5");
-                      setNewGoalColor("#6366f1");
+                      setNewGoalColor("#FFB3BA");
                     }}
                   >
                     Cancel
@@ -575,7 +594,7 @@ const Index = () => {
                               setEditingGoalSettings(goal.id);
                               setNewGoalTitle(goal.title);
                               setNewGoalTarget(goal.target_count.toString());
-                              setNewGoalColor(goal.background_color || "#6366f1");
+                              setNewGoalColor(goal.background_color || "#FFB3BA");
                             }}
                             title="Edit goal settings"
                           >
@@ -617,15 +636,24 @@ const Index = () => {
                           placeholder="Enter target count"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Background Color</label>
-                        <Input
-                          type="color"
-                          value={newGoalColor}
-                          onChange={(e) => setNewGoalColor(e.target.value)}
-                          className="w-full h-10"
-                        />
-                      </div>
+                       <div>
+                         <label className="block text-sm font-medium mb-2">Background Color</label>
+                         <div className="flex gap-2">
+                           {pastelColors.map((color) => (
+                             <button
+                               key={color}
+                               type="button"
+                               className={`w-8 h-8 rounded-full border-2 transition-all ${
+                                 newGoalColor === color 
+                                   ? 'border-primary scale-110' 
+                                   : 'border-muted hover:border-primary/50'
+                               }`}
+                               style={{ backgroundColor: color }}
+                               onClick={() => setNewGoalColor(color)}
+                             />
+                           ))}
+                         </div>
+                       </div>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -640,12 +668,12 @@ const Index = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => {
-                            setEditingGoalSettings(null);
-                            setNewGoalTitle("");
-                            setNewGoalTarget("");
-                            setNewGoalColor("#6366f1");
-                          }}
+                           onClick={() => {
+                             setEditingGoalSettings(null);
+                             setNewGoalTitle("");
+                             setNewGoalTarget("");
+                             setNewGoalColor("#FFB3BA");
+                           }}
                         >
                           Cancel
                         </Button>
