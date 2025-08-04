@@ -47,13 +47,16 @@ const Index = () => {
   const [editingGoal, setEditingGoal] = useState<string | null>(null);
   const [editingSubgoals, setEditingSubgoals] = useState<string | null>(null);
   const [editingGoalSettings, setEditingGoalSettings] = useState<string | null>(null);
+  const [editingSubgoal, setEditingSubgoal] = useState<string | null>(null);
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalText, setNewGoalText] = useState("");
   const [newGoalTarget, setNewGoalTarget] = useState("5");
   const [newGoalColor, setNewGoalColor] = useState("#6366f1");
+  const [showAddGoalDialog, setShowAddGoalDialog] = useState(false);
   const [newSubgoalText, setNewSubgoalText] = useState("");
   const [newSubgoalType, setNewSubgoalType] = useState<'one_time' | 'recurring'>('one_time');
   const [newSubgoalTarget, setNewSubgoalTarget] = useState("1");
+  const [editingSubgoalTitle, setEditingSubgoalTitle] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -168,6 +171,7 @@ const Index = () => {
           title: newGoalText.trim(),
           type: 'one_time',
           target_count: parseInt(newGoalTarget) || 5,
+          background_color: newGoalColor,
           user_id: user.id
         });
 
@@ -176,6 +180,8 @@ const Index = () => {
       await fetchGoals();
       setNewGoalText("");
       setNewGoalTarget("5");
+      setNewGoalColor("#6366f1");
+      setShowAddGoalDialog(false);
       
       toast({
         description: `✨ New goal "${newGoalText.trim()}" added!`,
@@ -264,6 +270,35 @@ const Index = () => {
       toast({
         title: "Error updating goal",
         description: "Failed to update goal. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateSubgoalTitle = async (subgoalId: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from('subgoals')
+        .update({ title: newTitle.trim() })
+        .eq('id', subgoalId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      await fetchGoals();
+      setEditingSubgoal(null);
+      setEditingSubgoalTitle("");
+      
+      toast({
+        description: "✨ Subgoal updated successfully!",
+      });
+    } catch (error) {
+      console.error('Error updating subgoal:', error);
+      toast({
+        title: "Error updating subgoal",
+        description: "Failed to update subgoal. Please try again.",
         variant: "destructive",
       });
     }
@@ -412,42 +447,73 @@ const Index = () => {
         </div>
 
         {/* Add New Goal */}
-        <Card className="bg-gradient-card shadow-card border-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              Add New Goal
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-3">
-              <Input
-                placeholder="What's your goal? (add emoji at start if you want)"
-                value={newGoalText}
-                onChange={(e) => setNewGoalText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') addGoal();
-                }}
-                className="flex-1"
-              />
-                <Input
-                  type="number"
-                  placeholder="Target"
-                  value={newGoalTarget}
-                  onChange={(e) => setNewGoalTarget(e.target.value)}
-                  className="w-20"
-                  min="1"
-                />
-              <Button 
-                onClick={addGoal} 
-                disabled={!newGoalText.trim()}
-                className="bg-gradient-primary hover:shadow-primary transition-smooth"
-              >
-                Add Goal
+        <div className="flex justify-center">
+          <Dialog open={showAddGoalDialog} onOpenChange={setShowAddGoalDialog}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-primary hover:shadow-primary transition-smooth">
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Goal
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Goal</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Goal Title</label>
+                  <Input
+                    placeholder="What's your goal? (add emoji at start if you want)"
+                    value={newGoalText}
+                    onChange={(e) => setNewGoalText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') addGoal();
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Target</label>
+                  <Input
+                    type="number"
+                    placeholder="Target"
+                    value={newGoalTarget}
+                    onChange={(e) => setNewGoalTarget(e.target.value)}
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Background Color</label>
+                  <Input
+                    type="color"
+                    value={newGoalColor}
+                    onChange={(e) => setNewGoalColor(e.target.value)}
+                    className="w-full h-10"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowAddGoalDialog(false);
+                      setNewGoalText("");
+                      setNewGoalTarget("5");
+                      setNewGoalColor("#6366f1");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={addGoal} 
+                    disabled={!newGoalText.trim()}
+                    className="bg-gradient-primary hover:shadow-primary transition-smooth"
+                  >
+                    Add Goal
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
 
         {/* Goals Grid */}
         {goals.length === 0 ? (
@@ -465,9 +531,9 @@ const Index = () => {
             {goals.map((goal) => (
               <Card 
                 key={goal.id} 
-                className="bg-gradient-card shadow-card border-0 hover:shadow-primary transition-smooth"
+                className="shadow-card border-0 hover:shadow-primary transition-smooth"
                 style={{ 
-                  backgroundColor: goal.background_color ? `${goal.background_color}15` : undefined,
+                  backgroundColor: goal.background_color || 'hsl(var(--card))',
                   borderColor: goal.background_color || undefined
                 }}
               >
@@ -675,27 +741,73 @@ const Index = () => {
 
                       {goal.subgoals && goal.subgoals.length > 0 ? (
                         <div className="space-y-2">
-                          {goal.subgoals.map((subgoal) => (
-                             <div key={subgoal.id} className="p-2 bg-muted/20 rounded">
-                               <div className="flex items-center gap-2 mb-2">
-                                 <div className="flex items-center gap-2">
-                                   <span className="text-sm">{subgoal.title}</span>
-                                   {(subgoal.progress || 0) >= (subgoal.target || subgoal.target_count) && (
-                                     <CheckCircle2 className="h-4 w-4 text-success" />
-                                   )}
-                                 </div>
-                                 <Badge variant={subgoal.type === 'recurring' ? 'default' : 'secondary'} className="text-xs">
-                                   {subgoal.type === 'recurring' ? 'Monthly' : 'One-time'}
-                                 </Badge>
-                                 <Button
-                                   size="sm"
-                                   variant="ghost"
-                                   onClick={() => deleteSubgoal(subgoal.id)}
-                                   className="h-6 w-6 p-0 text-destructive hover:text-destructive ml-auto"
-                                 >
-                                   <Trash2 className="h-3 w-3" />
-                                 </Button>
-                               </div>
+                           {goal.subgoals.map((subgoal) => (
+                              <div key={subgoal.id} className="p-2 bg-muted/20 rounded">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="flex items-center gap-2">
+                                    {editingSubgoal === subgoal.id ? (
+                                      <div className="flex items-center gap-2">
+                                        <Input
+                                          value={editingSubgoalTitle}
+                                          onChange={(e) => setEditingSubgoalTitle(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') updateSubgoalTitle(subgoal.id, editingSubgoalTitle);
+                                            if (e.key === 'Escape') {
+                                              setEditingSubgoal(null);
+                                              setEditingSubgoalTitle("");
+                                            }
+                                          }}
+                                          className="h-6 text-sm"
+                                          autoFocus
+                                        />
+                                        <Button size="sm" onClick={() => updateSubgoalTitle(subgoal.id, editingSubgoalTitle)} className="h-6 w-6 p-0">
+                                          <Check className="h-3 w-3" />
+                                        </Button>
+                                        <Button 
+                                          size="sm" 
+                                          variant="outline"
+                                          onClick={() => {
+                                            setEditingSubgoal(null);
+                                            setEditingSubgoalTitle("");
+                                          }}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm">{subgoal.title}</span>
+                                        {(subgoal.current_progress || 0) >= subgoal.target_count && (
+                                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => {
+                                            setEditingSubgoal(subgoal.id);
+                                            setEditingSubgoalTitle(subgoal.title);
+                                          }}
+                                          className="h-6 w-6 p-0"
+                                          title="Edit subgoal"
+                                        >
+                                          <Edit2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Badge variant={subgoal.type === 'recurring' ? 'default' : 'secondary'} className="text-xs">
+                                    {subgoal.type === 'recurring' ? 'Monthly' : 'One-time'}
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => deleteSubgoal(subgoal.id)}
+                                    className="h-6 w-6 p-0 text-destructive hover:text-destructive ml-auto"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
                                <div className="flex items-center gap-2">
                                  <Progress 
                                    value={subgoal.target_count > 0 
