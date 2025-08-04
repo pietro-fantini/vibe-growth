@@ -320,6 +320,16 @@ const Index = () => {
     if (!targetValue || targetValue < 1) return;
     
     try {
+      // Get the subgoal and its parent goal id
+      const { data: subgoalData, error: subgoalError } = await supabase
+        .from('subgoals')
+        .select('goal_id')
+        .eq('id', subgoalId)
+        .single();
+
+      if (subgoalError) throw subgoalError;
+
+      // Update the subgoal target
       const { error } = await supabase
         .from('subgoals')
         .update({ target_count: targetValue })
@@ -327,6 +337,13 @@ const Index = () => {
         .eq('user_id', user?.id);
 
       if (error) throw error;
+
+      // Recalculate the parent goal progress to reflect the new completion status
+      const { error: recalcError } = await supabase.rpc('recalculate_goal_progress', {
+        goal_uuid: subgoalData.goal_id
+      });
+
+      if (recalcError) throw recalcError;
 
       await fetchGoals();
       setEditingSubgoalTarget(null);
@@ -478,7 +495,7 @@ const Index = () => {
               onClick={handleSignOut}
               variant="outline"
               size="sm"
-              className="flex items-center"
+              className="flex items-center hover:bg-accent hover:text-accent-foreground"
             >
               <LogOut className="h-4 w-4" />
             </Button>
@@ -491,7 +508,7 @@ const Index = () => {
             <DialogTrigger asChild>
               <Button className="bg-gradient-primary hover:shadow-primary transition-smooth">
                 <Plus className="h-4 w-4 mr-2" />
-                Add New Goal
+                Add Goal
               </Button>
             </DialogTrigger>
             <DialogContent>
