@@ -364,11 +364,14 @@ const Index = () => {
 
   const handleSignOut = async () => {
     try {
+      console.log("Starting sign out process...");
       await signOut();
+      console.log("Sign out completed successfully");
       toast({
         description: "👋 Signed out successfully",
       });
     } catch (error) {
+      console.error("Error during sign out:", error);
       toast({
         title: "Error signing out",
         description: "Failed to sign out. Please try again.",
@@ -480,7 +483,7 @@ const Index = () => {
       <div className="container mx-auto py-8 space-y-8">
         {/* Header */}
         <div className="relative flex items-center">
-          <div className="absolute inset-0 flex justify-center items-center">
+          <div className="absolute inset-0 flex justify-center items-center pointer-events-none">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center shadow-primary">
                 <Target className="w-5 h-5 text-primary-foreground" />
@@ -490,9 +493,12 @@ const Index = () => {
               </h1>
             </div>
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto relative z-10">
             <Button 
-              onClick={handleSignOut}
+              onClick={() => {
+                console.log("Logout button clicked!");
+                handleSignOut();
+              }}
               variant="outline"
               size="sm"
               className="flex items-center hover:bg-accent hover:text-accent-foreground"

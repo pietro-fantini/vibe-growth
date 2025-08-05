@@ -1,1 +1,11 @@
 project_id = "inzcqenjspikefbsoagh"
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/auth/callback"]
+
+[auth.external.google]
+enabled = true
+client_id = "your-google-client-id"
+secret = "your-google-client-secret"
