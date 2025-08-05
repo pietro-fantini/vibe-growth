@@ -7,5 +7,5 @@ additional_redirect_urls = ["http://localhost:5173/auth/callback"]
 
 [auth.external.google]
 enabled = true
-client_id = "your-google-client-id"
+client_id = "621758460107-42k0ko28qkejcllcraf4ns3lrdug4sja.apps.googleusercontent.com"
 secret = "your-google-client-secret"
