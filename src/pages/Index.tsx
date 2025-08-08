@@ -16,7 +16,6 @@ import { StatCard } from "@/components/StatCard";
 import { ProgressChart } from "@/components/ProgressChart";
 import GoalCompletionChart from "@/components/GoalCompletionChart";
 import MonthlyTotalsChart from "@/components/MonthlyTotalsChart";
-import GoalMonthlyTrendChart from "@/components/GoalMonthlyTrendChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Goal {
@@ -163,7 +162,7 @@ const Index = () => {
 
       const goalsWithProgress = goalsData.map(goal => {
         const progress = progressData.find(p => p.id === goal.id);
-        const goalSubgoals = subgoalsData.filter(s => s.goal_id === goal.id).map(subgoal => {
+        const goalSubgoalsRaw = subgoalsData.filter(s => s.goal_id === goal.id).map(subgoal => {
           const subgoalProgress = subgoalProgressData.find(sp => sp.subgoal_id === subgoal.id);
           return {
             ...subgoal,
@@ -175,6 +174,8 @@ const Index = () => {
               : 0
           };
         });
+        // Hide completed one-time subgoals from the card UI while keeping them counted in progress/analytics
+        const goalSubgoals = goalSubgoalsRaw.filter(sg => !(sg.type === 'one_time' && (sg.current_progress || 0) >= sg.target_count));
         return {
           ...goal,
           current_progress: progress?.current_progress || 0,
@@ -553,6 +554,8 @@ const Index = () => {
               : 0,
           };
         });
+        // Hide completed one-time subgoals locally
+        const cleanedSubgoals = updatedSubgoals.filter(sg => !(sg.type === 'one_time' && (sg.current_progress || 0) >= sg.target_count));
 
         if (parentDelta !== 0) {
           const updatedParentProgress = (goal.current_progress || 0) + parentDelta;
@@ -561,13 +564,13 @@ const Index = () => {
             : 0;
           return {
             ...goal,
-            subgoals: updatedSubgoals,
+            subgoals: cleanedSubgoals,
             current_progress: updatedParentProgress,
             completion_percentage: updatedCompletion,
           };
         }
 
-        return { ...goal, subgoals: updatedSubgoals };
+        return { ...goal, subgoals: cleanedSubgoals };
       });
     });
 
@@ -896,11 +899,6 @@ const Index = () => {
                       <Progress 
                         value={goal.completion_percentage || 0} 
                         className="flex-1 h-3"
-                        style={{ 
-                          background: "linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--success)) 100%)",
-                          mask: `linear-gradient(90deg, #000 0 ${goal.completion_percentage || 0}%, transparent ${goal.completion_percentage || 0}% 100%)`,
-                          WebkitMask: `linear-gradient(90deg, #000 0 ${goal.completion_percentage || 0}%, transparent ${goal.completion_percentage || 0}% 100%)`
-                        }}
                       />
                       <Badge variant="secondary">
                         {goal.current_progress || 0} / {goal.target_count}
@@ -1068,11 +1066,6 @@ const Index = () => {
                                       : 0
                                     } 
                                     className="flex-1 h-2"
-                                    style={{ 
-                                      background: "linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--success)) 100%)",
-                                      mask: `linear-gradient(90deg, #000 0 ${subgoal.target_count > 0 ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100) : 0}%, transparent ${subgoal.target_count > 0 ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100) : 0}% 100%)`,
-                                      WebkitMask: `linear-gradient(90deg, #000 0 ${subgoal.target_count > 0 ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100) : 0}%, transparent ${subgoal.target_count > 0 ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100) : 0}% 100%)`
-                                    }}
                                   />
                                   {editingSubgoalTarget === subgoal.id ? (
                                     <div className="flex items-center gap-1">
@@ -1167,7 +1160,6 @@ const Index = () => {
             {/* Overview Stats */}
             {goals.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard title="Total Goals" value={goals.length} variant="default" />
                 <StatCard 
                   title="Completed Goals"
                   value={goals.filter(g => (g.current_progress || 0) >= g.target_count).length}
@@ -1175,18 +1167,22 @@ const Index = () => {
                   className="border-success/70"
                 />
                 <StatCard 
-                  title="Active Subgoals"
-                  value={goals.reduce((acc, g) => acc + (g.subgoals?.length || 0), 0)}
+                  title="Completed Subgoals"
+                  value={goals.reduce((acc, g) => acc + (g.subgoals?.filter(sg => (sg.current_progress || 0) >= sg.target_count).length || 0), 0)}
                   variant="default"
+                  className="border-success/70"
                 />
                 <StatCard 
-                  title="Avg. Completion"
-                  value={`${Math.round(
-                    goals.reduce((acc, g) => acc + (g.completion_percentage || 0), 0) / goals.length
-                  )}%`}
-                  progress={
-                    goals.reduce((acc, g) => acc + (g.completion_percentage || 0), 0) / goals.length
-                  }
+                  title="Non Completed Goals"
+                  value={goals.filter(g => (g.current_progress || 0) < g.target_count).length}
+                  variant="default"
+                  className="border-primary/70"
+                />
+                <StatCard 
+                  title="Non Completed Subgoals"
+                  value={goals.reduce((acc, g) => acc + (g.subgoals?.filter(sg => (sg.current_progress || 0) < sg.target_count).length || 0), 0)}
+                  variant="default"
+                  className="border-primary/70"
                 />
               </div>
             )}
@@ -1194,11 +1190,9 @@ const Index = () => {
                 {/* Charts */}
                 {goals.length > 0 && (
                   <>
+                    {/* On mobile, show pie chart first */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      <div className="lg:col-span-2">
-                        <MonthlyTotalsChart months={12} height={320} />
-                      </div>
-                      <div>
+                      <div className="order-1 lg:order-2 lg:col-span-1">
                         <ProgressChart 
                           title="Completed vs Remaining"
                           type="pie"
@@ -1209,12 +1203,8 @@ const Index = () => {
                           height={280}
                         />
                       </div>
-                    </div>
-
-                    {/* Time-based analytics */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      <div className="lg:col-span-2">
-                        <GoalMonthlyTrendChart months={6} topN={5} height={320} />
+                      <div className="order-2 lg:order-1 lg:col-span-2">
+                        <MonthlyTotalsChart months={12} height={320} />
                       </div>
                     </div>
                   </>

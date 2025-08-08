@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { ProgressRing } from "@/components/ui/progress-ring";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 interface StatCardProps {
@@ -23,6 +24,7 @@ export function StatCard({
   variant = "default",
   className
 }: StatCardProps) {
+  const isMobile = useIsMobile();
   const getTrendColor = () => {
     switch (trend) {
       case "up": return "text-success";
@@ -67,11 +69,13 @@ export function StatCard({
             </div>
           )}
           {progress !== undefined && (
-            <ProgressRing progress={progress} size="sm">
-              <span className="text-xs font-bold text-primary">
-                {Math.round(progress)}%
-              </span>
-            </ProgressRing>
+            !isMobile && (
+              <ProgressRing progress={progress} size="sm">
+                <span className="text-xs font-bold text-primary">
+                  {Math.round(progress)}%
+                </span>
+              </ProgressRing>
+            )
           )}
         </div>
       </div>

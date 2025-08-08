@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 
 interface MonthlyTotalsChartProps {
@@ -17,6 +18,7 @@ interface Row {
 const MonthlyTotalsChart = ({ months = 12, height = 300 }: MonthlyTotalsChartProps) => {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const load = async () => {
@@ -35,6 +37,7 @@ const MonthlyTotalsChart = ({ months = 12, height = 300 }: MonthlyTotalsChartPro
 
   const data = useMemo(() => {
     // keep only last N months
+    const maxMonths = isMobile ? Math.min(months, 6) : months;
     const parsed = rows
       .map((r) => ({
         month: new Date(r.month_start),
@@ -46,7 +49,7 @@ const MonthlyTotalsChart = ({ months = 12, height = 300 }: MonthlyTotalsChartPro
     // build a continuous timeline of months
     const items: { name: string; value: number }[] = [];
     const start = new Date(end);
-    start.setMonth(start.getMonth() - (months - 1));
+    start.setMonth(start.getMonth() - (maxMonths - 1));
     const cursor = new Date(start);
 
     while (cursor <= end) {
@@ -56,22 +59,22 @@ const MonthlyTotalsChart = ({ months = 12, height = 300 }: MonthlyTotalsChartPro
       cursor.setMonth(cursor.getMonth() + 1);
     }
     return items;
-  }, [rows, months]);
+  }, [rows, months, isMobile]);
 
   return (
     <Card className="shadow-card border-0">
       <CardHeader>
-        <CardTitle>Monthly Total Completions</CardTitle>
+        <CardTitle>Subgoal Completions</CardTitle>
       </CardHeader>
       <CardContent>
         <div style={{ width: "100%", height }}>
           <ResponsiveContainer>
-            <LineChart data={data} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
+            <LineChart data={data} margin={{ left: isMobile ? 0 : 8, right: 8, top: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <XAxis dataKey="name" interval={isMobile ? 'preserveStartEnd' : 0} tick={{ fontSize: isMobile ? 10 : 12 }} minTickGap={isMobile ? 24 : 8} />
+              <YAxis allowDecimals={false} tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 28 : 40} />
               <Tooltip formatter={(v: any) => [v, "Completions"]} />
-              <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="value" stroke="hsl(var(--success))" strokeWidth={2} dot={{ r: isMobile ? 2 : 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

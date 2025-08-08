@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import { format } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Row {
   goal_id: string;
@@ -28,6 +29,7 @@ const COLORS = [
 const GoalMonthlyTrendChart = ({ months = 6, topN = 5, height = 320 }: GoalMonthlyTrendChartProps) => {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const load = async () => {
@@ -58,15 +60,17 @@ const GoalMonthlyTrendChart = ({ months = 6, topN = 5, height = 320 }: GoalMonth
     // End of window is last data month, or now if no valid data rows
     const end = parsed.length > 0 ? parsed[parsed.length - 1].month : new Date();
     const start = new Date(end);
-    start.setMonth(start.getMonth() - (months - 1));
+    const maxMonths = isMobile ? Math.min(months, 4) : months;
+    start.setMonth(start.getMonth() - (maxMonths - 1));
 
     const inWindow = parsed.filter((p) => p.month >= start && p.month <= end);
     const sums = new Map<string, number>();
     inWindow.forEach((p) => sums.set(p.goal_id, (sums.get(p.goal_id) || 0) + p.value));
 
+    const limit = isMobile ? Math.min(topN, 3) : topN;
     const topGoalIds = Array.from(sums.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, topN)
+      .slice(0, limit)
       .map(([id]) => id);
 
     const goalKeyById = new Map<string, string>();
@@ -107,7 +111,7 @@ const GoalMonthlyTrendChart = ({ months = 6, topN = 5, height = 320 }: GoalMonth
 
     const keys = Array.from(goalKeyById.values());
     return { data: rowsOut, keys };
-  }, [rows, months, topN]);
+  }, [rows, months, topN, isMobile]);
 
   return (
     <Card className="shadow-card border-0">
@@ -117,12 +121,12 @@ const GoalMonthlyTrendChart = ({ months = 6, topN = 5, height = 320 }: GoalMonth
       <CardContent>
         <div style={{ width: "100%", height }}>
           <ResponsiveContainer>
-            <BarChart data={data} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
+            <BarChart data={data} margin={{ left: isMobile ? 0 : 8, right: 8, top: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <XAxis dataKey="name" tick={{ fontSize: isMobile ? 10 : 12 }} interval={isMobile ? 'preserveStartEnd' : 0} minTickGap={isMobile ? 24 : 8} />
+              <YAxis allowDecimals={false} tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 28 : 40} />
               <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 12 }} />
               {keys.map((k, i) => (
                 <Bar key={k} dataKey={k} stackId="a" fill={COLORS[i % COLORS.length]} />
               ))}
