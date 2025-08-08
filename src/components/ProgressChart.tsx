@@ -51,27 +51,28 @@ export function ProgressChart({
   const renderChart = () => {
     switch (type) {
       case "bar":
+        // Horizontal bar chart with sorting by value desc
+        const sorted = [...chartData].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
         return (
-          <BarChart data={chartData} margin={{ top: 12, right: 8, left: 8, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <BarChart layout="vertical" data={sorted} margin={{ top: 12, right: 12, left: 24, bottom: 12 }}>
+            <CartesianGrid horizontal strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
-              dataKey="shortName" 
-              fontSize={12}
-              tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              interval="preserveStartEnd"
-              minTickGap={12}
-              tickMargin={8}
-              tickLine={false}
-            />
-            <YAxis 
-              fontSize={12}
-              tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              type="number"
               domain={[0, 100]}
               tickCount={6}
               allowDecimals={false}
+              tick={{ fill: 'hsl(var(--muted-foreground))' }}
             />
-            <Bar dataKey="value" fill="var(--color-value)" radius={[6, 6, 0, 0]}>
-              <LabelList dataKey="value" position="top" formatter={(v: number) => `${v}%`} className="fill-foreground text-[10px]" />
+            <YAxis 
+              dataKey="shortName"
+              type="category"
+              width={120}
+              tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              tickMargin={8}
+              tickLine={false}
+            />
+            <Bar dataKey="value" fill="var(--color-value)" radius={[0, 6, 6, 0]} barSize={20}>
+              <LabelList dataKey="value" position="right" formatter={(v: number) => `${v}%`} className="fill-foreground text-[10px]" />
             </Bar>
             <ChartTooltip content={<ChartTooltipContent nameKey="value" />} />
           </BarChart>
@@ -106,12 +107,15 @@ export function ProgressChart({
               labelLine={false}
               isAnimationActive={false}
             >
-              {chartData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              {/* Green for Completed, Light red for Remaining */}
+              {chartData.map((d, index) => (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={d.name.toLowerCase().includes('completed') ? 'hsl(var(--success))' : '#FCA5A5'} 
+                />
               ))}
             </Pie>
             <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-            <ChartLegend content={<ChartLegendContent nameKey="name" />} />
           </PieChart>
         );
       

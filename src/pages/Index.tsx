@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { StatCard } from "@/components/StatCard";
 import { ProgressChart } from "@/components/ProgressChart";
+import GoalCompletionChart from "@/components/GoalCompletionChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Goal {
@@ -1090,11 +1091,9 @@ const Index = () => {
             {goals.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                  <ProgressChart 
+                  <GoalCompletionChart
                     title="Goal Completion (%)"
-                    type="bar"
-                    data={goals.map(g => ({ name: g.title, value: Math.round(g.completion_percentage || 0) }))}
-                    height={280}
+                    items={goals.map(g => ({ name: g.title, percentage: Math.round(g.completion_percentage || 0) }))}
                   />
                 </div>
                 <div>
