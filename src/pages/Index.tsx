@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { StatCard } from "@/components/StatCard";
 import { ProgressChart } from "@/components/ProgressChart";
 import GoalCompletionChart from "@/components/GoalCompletionChart";
+import MonthlyTotalsChart from "@/components/MonthlyTotalsChart";
+import GoalMonthlyTrendChart from "@/components/GoalMonthlyTrendChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Goal {
@@ -1089,26 +1091,39 @@ const Index = () => {
 
             {/* Charts */}
             {goals.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
-                  <GoalCompletionChart
-                    title="Goal Completion (%)"
-                    items={goals.map(g => ({ name: g.title, percentage: Math.round(g.completion_percentage || 0) }))}
-                  />
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    <GoalCompletionChart
+                      title="Goal Completion (%)"
+                      items={goals.map(g => ({ name: g.title, percentage: Math.round(g.completion_percentage || 0) }))}
+                    />
+                  </div>
+                  <div>
+                    <ProgressChart 
+                      title="Completed vs Remaining"
+                      type="pie"
+                      data={[
+                        { name: 'Completed', value: goals.filter(g => (g.current_progress || 0) >= g.target_count).length },
+                        { name: 'Remaining', value: goals.filter(g => (g.current_progress || 0) < g.target_count).length },
+                      ]}
+                      height={280}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <ProgressChart 
-                    title="Completed vs Remaining"
-                    type="pie"
-                    data={[
-                      { name: 'Completed', value: goals.filter(g => (g.current_progress || 0) >= g.target_count).length },
-                      { name: 'Remaining', value: goals.filter(g => (g.current_progress || 0) < g.target_count).length },
-                    ]}
-                    height={280}
-                  />
+
+                {/* Time-based analytics */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    <MonthlyTotalsChart months={12} height={320} />
+                  </div>
+                  <div>
+                    <GoalMonthlyTrendChart months={6} topN={5} height={320} />
+                  </div>
                 </div>
-              </div>
+              </>
             )}
+
           </TabsContent>
         </Tabs>
       </div>

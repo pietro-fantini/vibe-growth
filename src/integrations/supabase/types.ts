@@ -21,6 +21,7 @@ export type Database = {
           goal_id: string
           id: string
           period: string
+          period_month: string | null
           updated_at: string
         }
         Insert: {
@@ -29,6 +30,7 @@ export type Database = {
           goal_id: string
           id?: string
           period: string
+          period_month?: string | null
           updated_at?: string
         }
         Update: {
@@ -37,6 +39,7 @@ export type Database = {
           goal_id?: string
           id?: string
           period?: string
+          period_month?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -108,12 +111,49 @@ export type Database = {
         }
         Relationships: []
       }
+      progress_change_events: {
+        Row: {
+          delta: number
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["progress_entity"]
+          id: string
+          month_start: string | null
+          new_value: number
+          occurred_at: string
+          period: string | null
+          user_id: string
+        }
+        Insert: {
+          delta: number
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["progress_entity"]
+          id?: string
+          month_start?: string | null
+          new_value: number
+          occurred_at?: string
+          period?: string | null
+          user_id: string
+        }
+        Update: {
+          delta?: number
+          entity_id?: string
+          entity_type?: Database["public"]["Enums"]["progress_entity"]
+          id?: string
+          month_start?: string | null
+          new_value?: number
+          occurred_at?: string
+          period?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       subgoal_progress: {
         Row: {
           completed_count: number
           created_at: string
           id: string
           period: string
+          period_month: string | null
           subgoal_id: string
           updated_at: string
         }
@@ -122,6 +162,7 @@ export type Database = {
           created_at?: string
           id?: string
           period: string
+          period_month?: string | null
           subgoal_id: string
           updated_at?: string
         }
@@ -130,6 +171,7 @@ export type Database = {
           created_at?: string
           id?: string
           period?: string
+          period_month?: string | null
           subgoal_id?: string
           updated_at?: string
         }
@@ -225,6 +267,48 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_goal_progress_view: {
+        Row: {
+          completed_count: number | null
+          completion_percentage: number | null
+          goal_id: string | null
+          month_start: string | null
+          target_count: number | null
+          title: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_progress_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "current_goal_progress"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_progress_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goal_history"
+            referencedColumns: ["goal_id"]
+          },
+          {
+            foreignKeyName: "goal_progress_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_user_totals_view: {
+        Row: {
+          month_start: string | null
+          total_completed: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       decrement_subgoal_progress: {
@@ -255,6 +339,7 @@ export type Database = {
           goal_id: string
           id: string
           period: string
+          period_month: string | null
           updated_at: string
         }
       }
@@ -270,9 +355,14 @@ export type Database = {
         Args: { goal_uuid: string }
         Returns: undefined
       }
+      set_period_month_from_text: {
+        Args: { _period: string }
+        Returns: string
+      }
     }
     Enums: {
       goal_type: "one_time" | "recurring"
+      progress_entity: "goal" | "subgoal"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -401,6 +491,7 @@ export const Constants = {
   public: {
     Enums: {
       goal_type: ["one_time", "recurring"],
+      progress_entity: ["goal", "subgoal"],
     },
   },
 } as const
