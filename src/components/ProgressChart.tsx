@@ -107,11 +107,11 @@ export function ProgressChart({
               labelLine={false}
               isAnimationActive={false}
             >
-              {/* Green for Completed, Light red for Remaining */}
+              {/* Purple for Remaining, Green for Completed */}
               {chartData.map((d, index) => (
                 <Cell 
                   key={`cell-${index}`} 
-                  fill={d.name.toLowerCase().includes('completed') ? 'hsl(var(--success))' : '#FCA5A5'} 
+                  fill={d.name.toLowerCase().includes('completed') ? 'hsl(var(--success))' : 'hsl(var(--primary))'} 
                 />
               ))}
             </Pie>

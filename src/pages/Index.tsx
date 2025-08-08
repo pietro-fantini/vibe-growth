@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -67,6 +68,9 @@ const Index = () => {
   const [editingSubgoalTargetValue, setEditingSubgoalTargetValue] = useState("");
   const [recentlyCompletedSubgoalId, setRecentlyCompletedSubgoalId] = useState<string | null>(null);
   const [recentlyCompletedGoalId, setRecentlyCompletedGoalId] = useState<string | null>(null);
+  // Guided tour state
+  const [tourStep, setTourStep] = useState<number>(0); // 0 = off; 1 Add Goal; 2 Subgoals; 3 Dashboard
+  const [tourOpen, setTourOpen] = useState<boolean>(false);
 
   // Pastel color options
   const pastelColors = [
@@ -85,6 +89,21 @@ const Index = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Start guided tour only on first visit per user in this browser
+  useEffect(() => {
+    const seen = localStorage.getItem("vg_seen_tour_v1");
+    if (!seen) {
+      setTourStep(1);
+      setTourOpen(true);
+    }
+  }, []);
+
+  const endTour = () => {
+    localStorage.setItem("vg_seen_tour_v1", "1");
+    setTourOpen(false);
+    setTourStep(0);
+  };
 
   const fetchGoals = async () => {
     try {
@@ -668,6 +687,21 @@ const Index = () => {
               </div>
             </DialogContent>
           </Dialog>
+          {tourStep === 1 && (
+            <Popover open={tourOpen} onOpenChange={setTourOpen}>
+              <PopoverTrigger asChild>
+                <span />
+              </PopoverTrigger>
+              <PopoverContent align="end" side="bottom" className="max-w-xs">
+                <p className="text-sm mb-2 font-semibold">Start by creating your first goal</p>
+                <p className="text-xs text-muted-foreground mb-3">Goals are tracked monthly. Set a target of points to consider it completed. You earn points by completing subgoals.</p>
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="outline" onClick={endTour}>Skip</Button>
+                  <Button size="sm" onClick={() => { setTourStep(2); }}>Got it</Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         <Tabs defaultValue="goals" className="w-full">
@@ -835,6 +869,11 @@ const Index = () => {
                       <Progress 
                         value={goal.completion_percentage || 0} 
                         className="flex-1 h-3"
+                        style={{ 
+                          background: "linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--success)) 100%)",
+                          mask: `linear-gradient(90deg, #000 0 ${goal.completion_percentage || 0}%, transparent ${goal.completion_percentage || 0}% 100%)`,
+                          WebkitMask: `linear-gradient(90deg, #000 0 ${goal.completion_percentage || 0}%, transparent ${goal.completion_percentage || 0}% 100%)`
+                        }}
                       />
                       <Badge variant="secondary">
                         {goal.current_progress || 0} / {goal.target_count}
@@ -859,6 +898,18 @@ const Index = () => {
                           Add Subgoal
                         </Button>
                       </div>
+                      {tourStep === 2 && (
+                        <div className="mb-3">
+                          <Card className="p-3 border-primary/30 bg-primary/5">
+                            <p className="text-sm font-semibold mb-1">Plan your subgoals</p>
+                            <p className="text-xs text-muted-foreground">Set subgoals as recurring (reset monthly) or one-time (removed when completed).</p>
+                            <div className="flex justify-end gap-2 mt-2">
+                              <Button size="sm" variant="outline" onClick={endTour}>Skip</Button>
+                              <Button size="sm" onClick={() => setTourStep(3)}>Next</Button>
+                            </div>
+                          </Card>
+                        </div>
+                      )}
 
                       {editingSubgoals === goal.id && (
                         <div className="space-y-3 mb-4 p-3 bg-muted/30 rounded-lg">
@@ -983,13 +1034,18 @@ const Index = () => {
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2">
                                   <Progress 
                                     value={subgoal.target_count > 0 
                                       ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100)
                                       : 0
                                     } 
                                     className="flex-1 h-2"
+                                    style={{ 
+                                      background: "linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--success)) 100%)",
+                                      mask: `linear-gradient(90deg, #000 0 ${subgoal.target_count > 0 ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100) : 0}%, transparent ${subgoal.target_count > 0 ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100) : 0}% 100%)`,
+                                      WebkitMask: `linear-gradient(90deg, #000 0 ${subgoal.target_count > 0 ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100) : 0}%, transparent ${subgoal.target_count > 0 ? Math.min(((subgoal.current_progress || 0) / subgoal.target_count) * 100, 100) : 0}% 100%)`
+                                    }}
                                   />
                                   {editingSubgoalTarget === subgoal.id ? (
                                     <div className="flex items-center gap-1">
@@ -1072,6 +1128,15 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="dashboard" className="mt-6 space-y-6">
+            {tourStep === 3 && (
+              <Card className="p-3 border-primary/30 bg-primary/5">
+                <p className="text-sm font-semibold mb-1">Monitor your progress</p>
+                <p className="text-xs text-muted-foreground">Use the dashboard to monitor advancements across months and goals.</p>
+                <div className="flex justify-end mt-2">
+                  <Button size="sm" onClick={endTour}>Finish</Button>
+                </div>
+              </Card>
+            )}
             {/* Overview Stats */}
             {goals.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1099,40 +1164,34 @@ const Index = () => {
               </div>
             )}
 
-            {/* Charts */}
-            {goals.length > 0 && (
-              <>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2">
-                    <GoalCompletionChart
-                      title="Goal Completion (%)"
-                      items={goals.map(g => ({ name: g.title, percentage: Math.round(g.completion_percentage || 0) }))}
-                    />
-                  </div>
-                  <div>
-                    <ProgressChart 
-                      title="Completed vs Remaining"
-                      type="pie"
-                      data={[
-                        { name: 'Completed', value: goals.filter(g => (g.current_progress || 0) >= g.target_count).length },
-                        { name: 'Remaining', value: goals.filter(g => (g.current_progress || 0) < g.target_count).length },
-                      ]}
-                      height={280}
-                    />
-                  </div>
-                </div>
+                {/* Charts */}
+                {goals.length > 0 && (
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className="lg:col-span-2">
+                        <MonthlyTotalsChart months={12} height={320} />
+                      </div>
+                      <div>
+                        <ProgressChart 
+                          title="Completed vs Remaining"
+                          type="pie"
+                          data={[
+                            { name: 'Completed', value: goals.filter(g => (g.current_progress || 0) >= g.target_count).length },
+                            { name: 'Remaining', value: goals.filter(g => (g.current_progress || 0) < g.target_count).length },
+                          ]}
+                          height={280}
+                        />
+                      </div>
+                    </div>
 
-                {/* Time-based analytics */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2">
-                    <MonthlyTotalsChart months={12} height={320} />
-                  </div>
-                  <div>
-                    <GoalMonthlyTrendChart months={6} topN={5} height={320} />
-                  </div>
-                </div>
-              </>
-            )}
+                    {/* Time-based analytics */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className="lg:col-span-2">
+                        <GoalMonthlyTrendChart months={6} topN={5} height={320} />
+                      </div>
+                    </div>
+                  </>
+                )}
 
           </TabsContent>
         </Tabs>
