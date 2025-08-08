@@ -2,8 +2,8 @@ project_id = "inzcqenjspikefbsoagh"
 
 [auth]
 enabled = true
-site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://localhost:5173/auth/callback"]
+site_url = "http://localhost:8080"
+additional_redirect_urls = ["http://localhost:8080/auth/callback"]
 
 [auth.external.google]
 enabled = true

@@ -1,8 +1,17 @@
 import { Card } from "@/components/ui/card";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, PieChart, Pie, Cell, LabelList 
+} from "recharts";
+import { 
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
 
 interface ChartData {
-  name: string;
+  name: string; // full label
   value: number;
   progress?: number;
 }
@@ -28,77 +37,123 @@ export function ProgressChart({
   type = "line", 
   height = 300 
 }: ProgressChartProps) {
+  const chartData = data.map((d) => ({
+    ...d,
+    // Shorten labels for axes while keeping full name for tooltip
+    shortName: d.name.length > 14 ? `${d.name.slice(0, 12)}…` : d.name,
+  }));
+
+  const config = {
+    value: { label: "Value", color: "hsl(var(--primary))" },
+    progress: { label: "Progress", color: "hsl(var(--success))" },
+  } as const;
+
   const renderChart = () => {
     switch (type) {
       case "bar":
         return (
-          <BarChart data={data}>
+          <BarChart data={chartData} margin={{ top: 12, right: 8, left: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
-              dataKey="name" 
+              dataKey="shortName" 
               fontSize={12}
               tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              interval="preserveStartEnd"
+              minTickGap={12}
+              tickMargin={8}
+              tickLine={false}
             />
             <YAxis 
               fontSize={12}
               tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              domain={[0, 100]}
+              tickCount={6}
+              allowDecimals={false}
             />
-            <Bar 
-              dataKey="value" 
-              fill="hsl(var(--primary))"
-              radius={[4, 4, 0, 0]}
-            />
+            <Bar dataKey="value" fill="var(--color-value)" radius={[6, 6, 0, 0]}>
+              <LabelList dataKey="value" position="top" formatter={(v: number) => `${v}%`} className="fill-foreground text-[10px]" />
+            </Bar>
+            <ChartTooltip content={<ChartTooltipContent nameKey="value" />} />
           </BarChart>
         );
       
       case "pie":
+        // Render percent labels inside slices to avoid overflow
+        const renderPercentLabel = (props: any) => {
+          const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;
+          const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+          const rad = (Math.PI / 180) * midAngle;
+          const x = cx + radius * Math.cos(-rad);
+          const y = cy + radius * Math.sin(-rad);
+          const value = Math.round((percent || 0) * 100);
+          if (value === 0) return null;
+          return (
+            <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" style={{ fontSize: 12, fontWeight: 600 }}>
+              {value}%
+            </text>
+          );
+        };
         return (
           <PieChart>
             <Pie
-              data={data}
+              data={chartData}
               cx="50%"
               cy="50%"
+              innerRadius={40}
               outerRadius={80}
               dataKey="value"
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              label={renderPercentLabel}
+              labelLine={false}
+              isAnimationActive={false}
             >
-              {data.map((_, index) => (
+              {chartData.map((_, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
+            <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
+            <ChartLegend content={<ChartLegendContent nameKey="name" />} />
           </PieChart>
         );
       
       default:
         return (
-          <LineChart data={data}>
+          <LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
-              dataKey="name" 
+              dataKey="shortName" 
               fontSize={12}
               tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              interval="preserveStartEnd"
+              minTickGap={12}
+              tickMargin={8}
+              tickLine={false}
             />
             <YAxis 
               fontSize={12}
               tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              domain={[0, 100]}
+              tickCount={6}
+              allowDecimals={false}
             />
             <Line 
               type="monotone" 
               dataKey="value" 
-              stroke="hsl(var(--primary))" 
+              stroke="var(--color-value)" 
               strokeWidth={3}
-              dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
+              dot={{ fill: 'var(--color-value)', strokeWidth: 2, r: 4 }}
             />
-            {data[0]?.progress !== undefined && (
+            {chartData[0]?.progress !== undefined && (
               <Line 
                 type="monotone" 
                 dataKey="progress" 
-                stroke="hsl(var(--success))" 
+                stroke="var(--color-progress)" 
                 strokeWidth={2}
                 strokeDasharray="5 5"
-                dot={{ fill: 'hsl(var(--success))', strokeWidth: 2, r: 3 }}
+                dot={{ fill: 'var(--color-progress)', strokeWidth: 2, r: 3 }}
               />
             )}
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartLegend content={<ChartLegendContent />} />
           </LineChart>
         );
     }
@@ -107,9 +162,9 @@ export function ProgressChart({
   return (
     <Card className="p-6">
       <h3 className="text-lg font-semibold mb-4">{title}</h3>
-      <ResponsiveContainer width="100%" height={height}>
+      <ChartContainer config={config} style={{ height }}>
         {renderChart()}
-      </ResponsiveContainer>
+      </ChartContainer>
     </Card>
   );
 }

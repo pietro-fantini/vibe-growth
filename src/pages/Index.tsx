@@ -7,10 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Edit2, Plus, Check, X, LogOut, Target, Loader2, Minus, ChevronDown, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Trash2, Edit2, Plus, Check, X, LogOut, Target, Loader2, Minus, LayoutGrid, BarChart2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { StatCard } from "@/components/StatCard";
+import { ProgressChart } from "@/components/ProgressChart";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Goal {
   id: string;
@@ -59,6 +62,8 @@ const Index = () => {
   const [editingSubgoalTitle, setEditingSubgoalTitle] = useState("");
   const [editingSubgoalTarget, setEditingSubgoalTarget] = useState<string | null>(null);
   const [editingSubgoalTargetValue, setEditingSubgoalTargetValue] = useState("");
+  const [recentlyCompletedSubgoalId, setRecentlyCompletedSubgoalId] = useState<string | null>(null);
+  const [recentlyCompletedGoalId, setRecentlyCompletedGoalId] = useState<string | null>(null);
 
   // Pastel color options
   const pastelColors = [
@@ -71,47 +76,42 @@ const Index = () => {
 
   useEffect(() => {
     if (user) {
+      // Avoid showing the full-page loader during background refreshes
+      if (goals.length === 0) setLoading(true);
       fetchGoals();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchGoals = async () => {
     try {
-      setLoading(true);
-      const { data: goalsData, error: goalsError } = await supabase
-        .from('goals')
-        .select('*')
-        .eq('user_id', user?.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+      // Run queries in parallel to reduce latency
+      const [goalsRes, progressRes, subgoalsRes, subgoalProgressRes] = await Promise.all([
+        supabase.from('goals')
+          .select('*')
+          .eq('user_id', user?.id)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false }),
+        supabase.from('current_goal_progress')
+          .select('*')
+          .eq('user_id', user?.id),
+        supabase.from('subgoals')
+          .select('*')
+          .eq('user_id', user?.id)
+          .eq('is_active', true),
+        supabase.from('subgoal_progress').select('*'),
+      ]);
 
-      if (goalsError) throw goalsError;
+      if (goalsRes.error) throw goalsRes.error;
+      if (progressRes.error) throw progressRes.error;
+      if (subgoalsRes.error) throw subgoalsRes.error;
+      if (subgoalProgressRes.error) throw subgoalProgressRes.error;
 
-      // Fetch current progress for each goal
-      const { data: progressData, error: progressError } = await supabase
-        .from('current_goal_progress')
-        .select('*')
-        .eq('user_id', user?.id);
+      const goalsData = goalsRes.data || [];
+      const progressData = progressRes.data || [];
+      const subgoalsData = subgoalsRes.data || [];
+      const subgoalProgressData = subgoalProgressRes.data || [];
 
-      if (progressError) throw progressError;
-
-      // Fetch subgoals for each goal
-      const { data: subgoalsData, error: subgoalsError } = await supabase
-        .from('subgoals')
-        .select('*')
-        .eq('user_id', user?.id)
-        .eq('is_active', true);
-
-      if (subgoalsError) throw subgoalsError;
-
-      // Fetch subgoal progress
-      const { data: subgoalProgressData, error: subgoalProgressError } = await supabase
-        .from('subgoal_progress')
-        .select('*');
-
-      if (subgoalProgressError) throw subgoalProgressError;
-
-      // Merge goals with their progress and subgoals
       const goalsWithProgress = goalsData.map(goal => {
         const progress = progressData.find(p => p.id === goal.id);
         const goalSubgoals = subgoalsData.filter(s => s.goal_id === goal.id).map(subgoal => {
@@ -148,6 +148,29 @@ const Index = () => {
   };
 
   const handleGoalProgress = async (goalId: string) => {
+    // Optimistic update
+    let previousGoals: Goal[] | null = null;
+    setGoals((current) => {
+      previousGoals = current;
+      return current.map((goal) => {
+        if (goal.id !== goalId) return goal;
+        const updatedCurrent = (goal.current_progress || 0) + 1;
+        const completion = goal.target_count > 0
+          ? Math.min((updatedCurrent / goal.target_count) * 100, 100)
+          : 0;
+        const crossed = (goal.current_progress || 0) < goal.target_count && updatedCurrent >= goal.target_count;
+        if (crossed) {
+          setRecentlyCompletedGoalId(goalId);
+          setTimeout(() => setRecentlyCompletedGoalId((id) => (id === goalId ? null : id)), 1200);
+        }
+        return {
+          ...goal,
+          current_progress: updatedCurrent,
+          completion_percentage: completion,
+        };
+      });
+    });
+
     try {
       const { error } = await supabase.rpc('increment_goal_progress', {
         goal_uuid: goalId,
@@ -156,14 +179,15 @@ const Index = () => {
 
       if (error) throw error;
 
-      // Refresh goals to get updated progress
-      await fetchGoals();
+      // Sync in background to ensure consistency without blocking UI
+      void fetchGoals();
       
       toast({
         description: "✅ Great job! Progress updated!",
       });
     } catch (error) {
       console.error('Error updating progress:', error);
+      if (previousGoals) setGoals(previousGoals);
       toast({
         title: "Error updating progress",
         description: "Failed to update goal progress. Please try again.",
@@ -443,6 +467,52 @@ const Index = () => {
   };
 
   const handleSubgoalProgress = async (subgoalId: string, increment: boolean = true) => {
+    // Optimistic update: update subgoal progress and possibly parent goal if crossing threshold
+    let previousGoals: Goal[] | null = null;
+    setGoals((current) => {
+      previousGoals = current;
+      return current.map((goal) => {
+        if (!goal.subgoals) return goal;
+        let parentDelta = 0;
+        const updatedSubgoals = goal.subgoals.map((sg) => {
+          if (sg.id !== subgoalId) return sg;
+          const oldProgress = sg.current_progress || 0;
+          const newProgress = increment ? oldProgress + 1 : Math.max(0, oldProgress - 1);
+          const wasCompleted = oldProgress >= sg.target_count;
+          const nowCompleted = newProgress >= sg.target_count;
+          if (increment && !wasCompleted && nowCompleted) parentDelta = 1;
+          if (!increment && wasCompleted && !nowCompleted) parentDelta = -1;
+          if (increment && !wasCompleted && nowCompleted) {
+            setRecentlyCompletedSubgoalId(subgoalId);
+            setTimeout(() => setRecentlyCompletedSubgoalId((id) => (id === subgoalId ? null : id)), 1200);
+          }
+          return {
+            ...sg,
+            current_progress: newProgress,
+            progress: newProgress,
+            completion_percentage: sg.target_count > 0
+              ? Math.min((newProgress / sg.target_count) * 100, 100)
+              : 0,
+          };
+        });
+
+        if (parentDelta !== 0) {
+          const updatedParentProgress = (goal.current_progress || 0) + parentDelta;
+          const updatedCompletion = goal.target_count > 0
+            ? Math.min((updatedParentProgress / goal.target_count) * 100, 100)
+            : 0;
+          return {
+            ...goal,
+            subgoals: updatedSubgoals,
+            current_progress: updatedParentProgress,
+            completion_percentage: updatedCompletion,
+          };
+        }
+
+        return { ...goal, subgoals: updatedSubgoals };
+      });
+    });
+
     try {
       const functionName = increment ? 'handle_subgoal_completion' : 'handle_subgoal_decrement';
       const { error } = await supabase.rpc(functionName, {
@@ -452,13 +522,15 @@ const Index = () => {
 
       if (error) throw error;
 
-      await fetchGoals();
+      // Sync in background to ensure correctness
+      void fetchGoals();
       
       toast({
         description: increment ? "✅ Progress added!" : "↩️ Progress removed!",
       });
     } catch (error) {
       console.error('Error updating subgoal progress:', error);
+      if (previousGoals) setGoals(previousGoals);
       toast({
         title: "Error updating progress",
         description: "Failed to update subgoal progress. Please try again.",
@@ -586,8 +658,17 @@ const Index = () => {
           </Dialog>
         </div>
 
-        {/* Goals Grid */}
-        {goals.length === 0 ? (
+        <Tabs defaultValue="goals" className="w-full">
+          <div className="flex items-center justify-between">
+            <TabsList>
+              <TabsTrigger value="goals" className="gap-2"><LayoutGrid className="h-4 w-4" /> Goals</TabsTrigger>
+              <TabsTrigger value="dashboard" className="gap-2"><BarChart2 className="h-4 w-4" /> Dashboard</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="goals" className="mt-6">
+            {/* Goals Grid */}
+            {goals.length === 0 ? (
           <Card className="bg-gradient-card shadow-card border-0">
             <CardContent className="text-center py-12">
               <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
@@ -597,7 +678,7 @@ const Index = () => {
               </p>
             </CardContent>
           </Card>
-        ) : (
+            ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {goals.map((goal) => (
               <Card 
@@ -736,7 +817,7 @@ const Index = () => {
                     </div>
                   )}
                 </CardHeader>
-                <CardContent>
+                <CardContent className={recentlyCompletedGoalId === goal.id ? 'transition-transform scale-[1.01]' : ''}>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Progress 
@@ -821,7 +902,10 @@ const Index = () => {
                       {goal.subgoals && goal.subgoals.length > 0 ? (
                         <div className="space-y-2">
                            {goal.subgoals.map((subgoal) => (
-                              <div key={subgoal.id} className="p-2 bg-card rounded border">
+                              <div
+                                key={subgoal.id}
+                                className={`p-2 bg-card rounded border transition-transform ${recentlyCompletedSubgoalId === subgoal.id ? 'ring-2 ring-success scale-[1.02]' : ''}`}
+                              >
                                 <div className="flex items-center gap-2 mb-2">
                                   <div className="flex items-center gap-2">
                                     {editingSubgoal === subgoal.id ? (
@@ -973,6 +1057,61 @@ const Index = () => {
             ))}
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="dashboard" className="mt-6 space-y-6">
+            {/* Overview Stats */}
+            {goals.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard title="Total Goals" value={goals.length} variant="default" />
+                <StatCard 
+                  title="Completed Goals"
+                  value={goals.filter(g => (g.current_progress || 0) >= g.target_count).length}
+                  variant="success"
+                />
+                <StatCard 
+                  title="Active Subgoals"
+                  value={goals.reduce((acc, g) => acc + (g.subgoals?.length || 0), 0)}
+                  variant="default"
+                />
+                <StatCard 
+                  title="Avg. Completion"
+                  value={`${Math.round(
+                    goals.reduce((acc, g) => acc + (g.completion_percentage || 0), 0) / goals.length
+                  )}%`}
+                  progress={
+                    goals.reduce((acc, g) => acc + (g.completion_percentage || 0), 0) / goals.length
+                  }
+                />
+              </div>
+            )}
+
+            {/* Charts */}
+            {goals.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <ProgressChart 
+                    title="Goal Completion (%)"
+                    type="bar"
+                    data={goals.map(g => ({ name: g.title, value: Math.round(g.completion_percentage || 0) }))}
+                    height={280}
+                  />
+                </div>
+                <div>
+                  <ProgressChart 
+                    title="Completed vs Remaining"
+                    type="pie"
+                    data={[
+                      { name: 'Completed', value: goals.filter(g => (g.current_progress || 0) >= g.target_count).length },
+                      { name: 'Remaining', value: goals.filter(g => (g.current_progress || 0) < g.target_count).length },
+                    ]}
+                    height={280}
+                  />
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
