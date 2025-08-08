@@ -213,6 +213,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          user_id: string
+          has_seen_tour: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          has_seen_tour?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          has_seen_tour?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_settings_user_id_fkey",
+            columns: ["user_id"],
+            isOneToOne: true,
+            referencedRelation: "users",
+            referencedColumns: ["id"],
+          }
+        ]
+      }
     }
     Views: {
       current_goal_progress: {

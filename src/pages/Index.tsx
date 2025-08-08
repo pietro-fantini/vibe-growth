@@ -86,21 +86,48 @@ const Index = () => {
       // Avoid showing the full-page loader during background refreshes
       if (goals.length === 0) setLoading(true);
       fetchGoals();
+      // Ensure user_settings exists and derive tour visibility from server
+      (async () => {
+        const { data, error } = await supabase
+          .from('user_settings')
+          .select('has_seen_tour')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (!error) {
+          const alreadySeenLocal = localStorage.getItem('vg_seen_tour_v1') === '1';
+          if (alreadySeenLocal) return;
+
+          if (!data) {
+            // Create settings, show once, and persist seen state
+            await supabase.from('user_settings').insert({ user_id: user.id, has_seen_tour: false });
+            setTourStep(1);
+            setTourOpen(true);
+            const { error: upErr } = await supabase
+              .from('user_settings')
+              .upsert({ user_id: user.id, has_seen_tour: true })
+              .select();
+            if (!upErr) localStorage.setItem('vg_seen_tour_v1', '1');
+          } else if (!data.has_seen_tour) {
+            setTourStep(1);
+            setTourOpen(true);
+            const { error: upErr } = await supabase
+              .from('user_settings')
+              .update({ has_seen_tour: true })
+              .eq('user_id', user.id)
+              .select();
+            if (!upErr) localStorage.setItem('vg_seen_tour_v1', '1');
+          }
+        }
+      })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Start guided tour only on first visit per user in this browser
-  useEffect(() => {
-    const seen = localStorage.getItem("vg_seen_tour_v1");
-    if (!seen) {
-      setTourStep(1);
-      setTourOpen(true);
-    }
-  }, []);
-
   const endTour = () => {
-    localStorage.setItem("vg_seen_tour_v1", "1");
+    if (user) {
+      void supabase.from('user_settings').upsert({ user_id: user.id, has_seen_tour: true });
+    }
     setTourOpen(false);
     setTourStep(0);
   };
