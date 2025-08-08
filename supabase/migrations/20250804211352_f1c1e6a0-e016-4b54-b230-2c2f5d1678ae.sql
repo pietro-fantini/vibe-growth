@@ -49,6 +49,11 @@ BEGIN
     -- Only increment parent goal if subgoal just became completed (crossed the threshold)
     IF NOT was_completed AND is_now_completed THEN
         PERFORM public.increment_goal_progress(parent_goal_id, 1);
+        -- If it's a one-time subgoal, deactivate it after crediting the goal
+        UPDATE public.subgoals
+        SET is_active = CASE WHEN type = 'one_time' THEN false ELSE is_active END,
+            updated_at = now()
+        WHERE id = subgoal_uuid;
     END IF;
 END;
 $function$;

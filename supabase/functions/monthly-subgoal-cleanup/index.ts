@@ -21,6 +21,7 @@ serve(async (req) => {
     
     // Get current period
     const currentPeriod = new Date().toISOString().slice(0, 7) // YYYY-MM format
+    const nextPeriod = getNextMonth(currentPeriod)
     
     // Get all active subgoals with their current progress
     const { data: subgoals, error: subgoalsError } = await supabaseClient
@@ -81,8 +82,6 @@ serve(async (req) => {
         // Incomplete one-time subgoals are kept as-is
       } else if (subgoal.type === 'recurring') {
         // Reset recurring subgoals to zero progress for the new month
-        const nextPeriod = getNextMonth(currentPeriod)
-        
         // Create new progress record for next month with zero count
         const { error: insertError } = await supabaseClient
           .from('subgoal_progress')
@@ -110,7 +109,27 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Cleanup completed: ${deletedCount} deleted, ${resetCount} reset`)
+    // Ensure all active goals start next month at zero
+    const { data: goals, error: goalsError } = await supabaseClient
+      .from('goals')
+      .select('id')
+      .eq('is_active', true)
+
+    if (goalsError) {
+      console.error('Error fetching goals for next month init:', goalsError)
+    } else if (goals) {
+      for (const g of goals) {
+        const { error: gpErr } = await supabaseClient
+          .from('goal_progress')
+          .insert({ goal_id: g.id, period: nextPeriod, completed_count: 0 })
+
+        if (gpErr && !gpErr.message.includes('duplicate key')) {
+          console.error(`Error initializing goal ${g.id} for ${nextPeriod}:`, gpErr)
+        }
+      }
+    }
+
+    console.log(`Cleanup completed: ${deletedCount} deleted, ${resetCount} reset`) 
 
     return new Response(
       JSON.stringify({ 

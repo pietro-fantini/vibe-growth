@@ -157,7 +157,7 @@ const Auth = () => {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Goal Tracker
+            Hurry UP!
           </CardTitle>
           <CardDescription>
             Track your progress and achieve your goals

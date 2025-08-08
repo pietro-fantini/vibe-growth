@@ -7,7 +7,7 @@ import { format } from "date-fns";
 interface Row {
   goal_id: string;
   title: string;
-  month_start: string; // date string
+  month_start: string | null; // date string (can be null from SQL views)
   completed_count: number;
 }
 
@@ -43,14 +43,19 @@ const GoalMonthlyTrendChart = ({ months = 6, topN = 5, height = 320 }: GoalMonth
   }, []);
 
   const { data, keys } = useMemo(() => {
-    const parsed = rows.map((r) => ({
-      goal_id: r.goal_id,
-      title: r.title,
-      month: new Date(r.month_start),
-      value: r.completed_count ?? 0,
-    }));
+    // Filter out any rows that do not have a month_start and normalize + sort
+    const parsed = rows
+      .filter((r) => !!r.month_start)
+      .map((r) => ({
+        goal_id: r.goal_id,
+        title: r.title,
+        month: new Date(r.month_start as string),
+        value: r.completed_count ?? 0,
+      }))
+      .sort((a, b) => a.month.getTime() - b.month.getTime());
 
     // Determine top goals by sum in window
+    // End of window is last data month, or now if no valid data rows
     const end = parsed.length > 0 ? parsed[parsed.length - 1].month : new Date();
     const start = new Date(end);
     start.setMonth(start.getMonth() - (months - 1));

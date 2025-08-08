@@ -244,6 +244,15 @@ const Index = () => {
 
       if (error) throw error;
 
+      // Also deactivate all child subgoals to keep data consistent
+      const { error: subError } = await supabase
+        .from('subgoals')
+        .update({ is_active: false })
+        .eq('goal_id', goalId)
+        .eq('user_id', user?.id);
+
+      if (subError) throw subError;
+
       await fetchGoals();
       
       toast({
@@ -564,7 +573,7 @@ const Index = () => {
                 <Target className="w-5 h-5 text-primary-foreground" />
               </div>
               <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Hurry Up!
+                Hurry UP!
               </h1>
             </div>
           </div>
@@ -1070,7 +1079,8 @@ const Index = () => {
                 <StatCard 
                   title="Completed Goals"
                   value={goals.filter(g => (g.current_progress || 0) >= g.target_count).length}
-                  variant="success"
+                  variant="default"
+                  className="border-success/70"
                 />
                 <StatCard 
                   title="Active Subgoals"

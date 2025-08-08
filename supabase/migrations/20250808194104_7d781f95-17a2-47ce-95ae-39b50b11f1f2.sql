@@ -226,6 +226,29 @@ FROM public.goal_progress gp
 JOIN public.goals g ON g.id = gp.goal_id
 GROUP BY g.user_id, gp.period_month;
 
+-- Ensure subgoals are deactivated when a goal is deactivated
+CREATE OR REPLACE FUNCTION public.trg_deactivate_subgoals_when_goal_inactive()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.is_active = false AND OLD.is_active = true THEN
+    UPDATE public.subgoals
+    SET is_active = false, updated_at = now()
+    WHERE goal_id = NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DO $$ BEGIN
+  CREATE TRIGGER trg_deactivate_subgoals_when_goal_inactive
+  AFTER UPDATE ON public.goals
+  FOR EACH ROW EXECUTE FUNCTION public.trg_deactivate_subgoals_when_goal_inactive();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- 9) Indexes
 CREATE INDEX IF NOT EXISTS idx_goal_progress_period_month ON public.goal_progress (period_month, goal_id);
 CREATE INDEX IF NOT EXISTS idx_subgoal_progress_period_month ON public.subgoal_progress (period_month, subgoal_id);
