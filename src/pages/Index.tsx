@@ -16,6 +16,8 @@ import { StatCard } from "@/components/StatCard";
 import { ProgressChart } from "@/components/ProgressChart";
 import GoalCompletionChart from "@/components/GoalCompletionChart";
 import MonthlyTotalsChart from "@/components/MonthlyTotalsChart";
+import MonthlyGoalCompletionsChart from "@/components/MonthlyGoalCompletionsChart";
+import SubgoalActivityHeatmap from "@/components/SubgoalActivityHeatmap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Goal {
@@ -1157,7 +1159,7 @@ const Index = () => {
                 </div>
               </Card>
             )}
-            {/* Overview Stats */}
+            {/* Overview Stats (big numbers as before) */}
             {goals.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard 
@@ -1187,28 +1189,33 @@ const Index = () => {
               </div>
             )}
 
-                {/* Charts */}
-                {goals.length > 0 && (
-                  <>
-                    {/* On mobile, show pie chart first */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      <div className="order-1 lg:order-2 lg:col-span-1">
-                        <ProgressChart 
-                          title="Completed vs Remaining"
-                          type="pie"
-                          data={[
-                            { name: 'Completed', value: goals.filter(g => (g.current_progress || 0) >= g.target_count).length },
-                            { name: 'Remaining', value: goals.filter(g => (g.current_progress || 0) < g.target_count).length },
-                          ]}
-                          height={280}
-                        />
-                      </div>
-                      <div className="order-2 lg:order-1 lg:col-span-2">
-                        <MonthlyTotalsChart months={12} height={320} />
-                      </div>
-                    </div>
-                  </>
-                )}
+            {/* Secondary row: Pie chart + Subgoal activity heatmap */}
+            {goals.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+                <div className="lg:col-span-1">
+                  <ProgressChart 
+                    title="Completed vs Remaining"
+                    type="pie"
+                    data={[
+                      { name: 'Completed', value: goals.filter(g => (g.current_progress || 0) >= g.target_count).length },
+                      { name: 'Remaining', value: goals.filter(g => (g.current_progress || 0) < g.target_count).length },
+                    ]}
+                    height={260}
+                  />
+                </div>
+                <div className="lg:col-span-2">
+                  <SubgoalActivityHeatmap weeks={52} />
+                </div>
+              </div>
+            )}
+
+            {/* Line charts side-by-side (same space). Order: Goals then Subgoals */}
+            {goals.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <MonthlyGoalCompletionsChart months={9} height={320} />
+                <MonthlyTotalsChart months={9} height={320} />
+              </div>
+            )}
 
           </TabsContent>
         </Tabs>

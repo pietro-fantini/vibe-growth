@@ -6,6 +6,9 @@ A simple, delightful way to track goals and subgoals with monthly progress. Sign
 
 ### Quick start
 
+NOTE:
+This web app uses some Supabase edge functions and views. If you are really interested in having the full experience write me.
+
 - **Prerequisites**: Node.js 18+ and npm
 - **Install dependencies**:
 ```sh
@@ -13,6 +16,11 @@ npm install
 ```
 - **Environment variables**: create a `.env.local` file in the project root (override the defaults used in development/demo):
 ```sh
+# Google OAuth Configuration
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
+VITE_GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# Supabase Configuration
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
