@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfWeek, subWeeks, addDays, isSameDay, startOfDay } from "date-fns";
@@ -25,6 +25,7 @@ const intensityClass = (count: number) => {
 const SubgoalActivityHeatmap = ({ weeks = 13, height = 260 }: SubgoalActivityHeatmapProps) => {
   const [data, setData] = useState<{ occurred_at: string; delta: number }[]>([]);
   const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -72,6 +73,16 @@ const SubgoalActivityHeatmap = ({ weeks = 13, height = 260 }: SubgoalActivityHea
     return weeksArr;
   }, [data, weeks]);
 
+  // Scroll to the right by default to show the most recent days first
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Use requestAnimationFrame to ensure layout is ready
+    requestAnimationFrame(() => {
+      el.scrollLeft = el.scrollWidth;
+    });
+  }, [grid]);
+
   // Month labels (approximate: label first of month)
   const monthLabels = useMemo(() => {
     const labels: { index: number; label: string }[] = [];
@@ -84,51 +95,54 @@ const SubgoalActivityHeatmap = ({ weeks = 13, height = 260 }: SubgoalActivityHea
     return labels;
   }, [grid]);
 
+  // Visual sizing: larger cells and tighter gaps to better fill the box
+  const CELL_SIZE = 20; // px
+  const CELL_GAP = 3; // px
+  const GRID_HEIGHT = 7 * (CELL_SIZE + CELL_GAP);
+
   return (
     <Card className="shadow-card border-0">
       <CardHeader>
         <CardTitle>Activity</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="w-full overflow-x-auto" style={{ height }}>
-          <div className="inline-flex flex-col gap-2" style={{ minWidth: `${weeks * 14 + 60}px` }}>
+        <div ref={scrollRef} className="w-full overflow-x-auto" style={{ height }}>
+          <div className="inline-flex flex-col gap-2" style={{ minWidth: `${weeks * (CELL_SIZE + CELL_GAP) + 60}px` }}>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Less</span>
-              <div className="h-3 w-3 rounded-sm bg-muted" />
-              <div className="h-3 w-3 rounded-sm bg-primary/20" />
-              <div className="h-3 w-3 rounded-sm bg-primary/40" />
-              <div className="h-3 w-3 rounded-sm bg-primary/60" />
-              <div className="h-3 w-3 rounded-sm bg-primary/80" />
-              <div className="h-3 w-3 rounded-sm bg-primary" />
+              <div className="rounded-sm bg-muted" style={{ width: CELL_SIZE / 2, height: CELL_SIZE / 2 }} />
+              <div className="rounded-sm bg-primary/20" style={{ width: CELL_SIZE / 2, height: CELL_SIZE / 2 }} />
+              <div className="rounded-sm bg-primary/40" style={{ width: CELL_SIZE / 2, height: CELL_SIZE / 2 }} />
+              <div className="rounded-sm bg-primary/60" style={{ width: CELL_SIZE / 2, height: CELL_SIZE / 2 }} />
+              <div className="rounded-sm bg-primary/80" style={{ width: CELL_SIZE / 2, height: CELL_SIZE / 2 }} />
+              <div className="rounded-sm bg-primary" style={{ width: CELL_SIZE / 2, height: CELL_SIZE / 2 }} />
               <span>More</span>
             </div>
-            <div className="flex gap-1">
+            <div className="flex" style={{ gap: CELL_GAP }}>
               {/* Month labels */}
               <div className="w-8" />
-              <div className="relative" style={{ width: `${weeks * 14}px` }}>
+              <div className="relative" style={{ width: `${weeks * (CELL_SIZE + CELL_GAP)}px` }}>
                 {monthLabels.map(({ index, label }) => (
-                  <span key={index} className="absolute text-[10px] text-muted-foreground" style={{ left: `${index * 14}px` }}>{label}</span>
+                  <span key={index} className="absolute text-[10px] text-muted-foreground" style={{ left: `${index * (CELL_SIZE + CELL_GAP)}px` }}>{label}</span>
                 ))}
               </div>
             </div>
             <div className="flex">
               {/* Weekday labels */}
-              <div className="flex flex-col justify-between mr-2 text-[10px] text-muted-foreground" style={{ height: 7 * 14 }}>
+              <div className="flex flex-col justify-between mr-2 text-[10px] text-muted-foreground" style={{ height: GRID_HEIGHT }}>
                 <span>Sun</span>
                 <span>Tue</span>
                 <span>Thu</span>
                 <span>Sat</span>
               </div>
               {/* Grid */}
-              <div className="flex gap-1" style={{ height: 7 * 14 }}>
+              <div className="flex" style={{ height: GRID_HEIGHT, gap: CELL_GAP }}>
                 {grid.map((col, i) => (
-                  <div key={i} className="flex flex-col gap-1">
+                  <div key={i} className="flex flex-col" style={{ gap: CELL_GAP }}>
                     {col.map((cell, j) => (
-                      <div
-                        key={j}
-                        className={`h-3.5 w-3.5 rounded-sm ${intensityClass(cell.count)}`}
-                        title={`${format(cell.date, "yyyy-MM-dd")} • ${cell.count} +1`}
-                      />
+                      <div key={j} className={`rounded-sm ${intensityClass(cell.count)}`}
+                           style={{ width: CELL_SIZE, height: CELL_SIZE }}
+                           title={`${format(cell.date, "yyyy-MM-dd")} • ${cell.count} +1`} />
                     ))}
                   </div>
                 ))}
