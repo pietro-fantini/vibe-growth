@@ -42,12 +42,9 @@ const MonthlyGoalCompletionsChart = ({ months = 9, height = 300 }: MonthlyGoalCo
     const parsed = rows
       .filter((r) => r.month_start)
       .map((r) => ({
-        month: new Date(r.month_start as string),
+        monthKey: format(new Date(r.month_start as string), "yyyy-MM-01"),
         isCompleted: (r.completed_count ?? 0) >= (r.target_count ?? 0) && (r.target_count ?? 0) > 0,
-      }))
-      .sort((a, b) => a.month.getTime() - b.month.getTime());
-
-    if (parsed.length === 0) return [] as { name: string; value: number }[];
+      }));
 
     const maxMonths = isMobile ? Math.min(months, 6) : months;
     // Always end at current month to ensure the last bucket is visible
@@ -62,7 +59,7 @@ const MonthlyGoalCompletionsChart = ({ months = 9, height = 300 }: MonthlyGoalCo
 
     while (cursor <= end) {
       const key = format(cursor, "yyyy-MM-01");
-      const count = parsed.filter((p) => format(p.month, "yyyy-MM-01") === key && p.isCompleted).length;
+      const count = parsed.filter((p) => p.monthKey === key && p.isCompleted).length;
       items.push({ name: format(cursor, "MMM yyyy"), value: count });
       cursor.setMonth(cursor.getMonth() + 1);
     }
@@ -118,7 +115,13 @@ const MonthlyGoalCompletionsChart = ({ months = 9, height = 300 }: MonthlyGoalCo
                 <XAxis dataKey="name" interval="preserveStartEnd" tick={{ fontSize: isMobile ? 10 : 12 }} minTickGap={24} />
                 <YAxis allowDecimals={false} tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 28 : 40} />
                 <Tooltip formatter={(v: any) => [v, "Goals Completed"]} />
-                <Line type="monotone" dataKey="value" stroke={`url(#${gradientId})`} strokeWidth={2.5} dot={{ r: isMobile ? 2 : 3, fill: `url(#${gradientId})` }} />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke={data.some((d) => d.value > 0) ? `url(#${gradientId})` : 'hsl(var(--primary))'}
+                  strokeWidth={2.5}
+                  dot={{ r: isMobile ? 2 : 3, fill: data.some((d) => d.value > 0) ? `url(#${gradientId})` : 'hsl(var(--primary))' }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>

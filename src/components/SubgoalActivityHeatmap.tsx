@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfWeek, subWeeks, addDays, isSameDay, startOfDay } from "date-fns";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface HeatmapCell {
   date: Date;
@@ -26,6 +28,7 @@ const SubgoalActivityHeatmap = ({ weeks = 13, height = 260 }: SubgoalActivityHea
   const [data, setData] = useState<{ occurred_at: string; delta: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [openKey, setOpenKey] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -137,15 +140,47 @@ const SubgoalActivityHeatmap = ({ weeks = 13, height = 260 }: SubgoalActivityHea
               </div>
               {/* Grid */}
               <div className="flex" style={{ height: GRID_HEIGHT, gap: CELL_GAP }}>
-                {grid.map((col, i) => (
-                  <div key={i} className="flex flex-col" style={{ gap: CELL_GAP }}>
-                    {col.map((cell, j) => (
-                      <div key={j} className={`rounded-sm ${intensityClass(cell.count)}`}
-                           style={{ width: CELL_SIZE, height: CELL_SIZE }}
-                           title={`${format(cell.date, "yyyy-MM-dd")} • ${cell.count} +1`} />
-                    ))}
-                  </div>
-                ))}
+                <TooltipProvider delayDuration={0}>
+                  {grid.map((col, i) => (
+                    <div key={i} className="flex flex-col" style={{ gap: CELL_GAP }}>
+                      {col.map((cell, j) => (
+                        <Popover key={`${i}-${j}`} open={openKey === `${i}-${j}`} onOpenChange={(o) => setOpenKey(o ? `${i}-${j}` : null)}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <PopoverTrigger asChild>
+                                <div
+                                  className={`rounded-sm ${intensityClass(cell.count)} cursor-pointer`}
+                                  style={{ width: CELL_SIZE, height: CELL_SIZE }}
+                                  title={`${format(cell.date, "yyyy-MM-dd")} • ${cell.count} activit${cell.count === 1 ? 'y' : 'ies'}`}
+                                  role="button"
+                                  tabIndex={0}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      setOpenKey(openKey === `${i}-${j}` ? null : `${i}-${j}`);
+                                    }
+                                  }}
+                                />
+                              </PopoverTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{format(cell.date, "EEE, MMM d, yyyy")}</span>
+                                <span className="text-muted-foreground text-xs">{cell.count} activit{cell.count === 1 ? 'y' : 'ies'}</span>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                          <PopoverContent side="top" align="center" className="py-2 px-3 text-sm">
+                            <div className="flex flex-col">
+                              <span className="font-medium">{format(cell.date, "EEE, MMM d, yyyy")}</span>
+                              <span className="text-muted-foreground text-xs">{cell.count} activit{cell.count === 1 ? 'y' : 'ies'}</span>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ))}
+                    </div>
+                  ))}
+                </TooltipProvider>
               </div>
             </div>
           </div>

@@ -37,19 +37,15 @@ const MonthlyTotalsChart = ({ months = 9, height = 300 }: MonthlyTotalsChartProp
   }, []);
 
   const data = useMemo(() => {
-    // keep only last N months
+    // keep only last N months; generate a continuous series ending at current month even if DB empty
     const maxMonths = isMobile ? Math.min(months, 6) : months;
-    const parsed = rows
-      .map((r) => ({
-        month: new Date(r.month_start),
-        value: r.total_completed ?? 0,
-      }))
-      .sort((a, b) => a.month.getTime() - b.month.getTime());
+    const parsed = rows.map((r) => ({
+      monthKey: format(new Date(r.month_start), "yyyy-MM-01"),
+      value: r.total_completed ?? 0,
+    }));
 
-    // Always end at current month to ensure the last bucket is visible
     const end = new Date();
     end.setDate(1);
-    // build a continuous timeline of months
     const items: { name: string; value: number }[] = [];
     const start = new Date(end);
     start.setMonth(start.getMonth() - (maxMonths - 1));
@@ -57,8 +53,8 @@ const MonthlyTotalsChart = ({ months = 9, height = 300 }: MonthlyTotalsChartProp
 
     while (cursor <= end) {
       const key = format(cursor, "yyyy-MM-01");
-      const found = parsed.find((p) => format(p.month, "yyyy-MM-01") === key);
-      items.push({ name: format(cursor, "MMM yyyy"), value: found?.value ?? 0 });
+      const found = parsed.find((p) => p.monthKey === key)?.value ?? 0;
+      items.push({ name: format(cursor, "MMM yyyy"), value: found });
       cursor.setMonth(cursor.getMonth() + 1);
     }
     return items;
@@ -107,7 +103,13 @@ const MonthlyTotalsChart = ({ months = 9, height = 300 }: MonthlyTotalsChartProp
                 <XAxis dataKey="name" interval="preserveStartEnd" tick={{ fontSize: isMobile ? 10 : 12 }} minTickGap={24} />
                 <YAxis allowDecimals={false} tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 28 : 40} />
                 <Tooltip formatter={(v: any) => [v, "Completions"]} />
-                <Line type="monotone" dataKey="value" stroke={`url(#${gradientId})`} strokeWidth={2.5} dot={{ r: isMobile ? 2 : 3, fill: `url(#${gradientId})` }} />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke={data.some((d) => d.value > 0) ? `url(#${gradientId})` : 'hsl(var(--primary))'}
+                  strokeWidth={2.5}
+                  dot={{ r: isMobile ? 2 : 3, fill: data.some((d) => d.value > 0) ? `url(#${gradientId})` : 'hsl(var(--primary))' }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
