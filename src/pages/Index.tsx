@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,6 +132,28 @@ const Index = () => {
     setTourOpen(false);
     setTourStep(0);
   };
+
+  // Derived dashboard aggregates
+  const completedGoalsCount = useMemo(
+    () => goals.filter(g => (g.current_progress || 0) >= g.target_count).length,
+    [goals]
+  );
+  const remainingGoalsCount = useMemo(
+    () => Math.max(0, goals.length - completedGoalsCount),
+    [goals, completedGoalsCount]
+  );
+  const pieData = useMemo(
+    () => (completedGoalsCount + remainingGoalsCount > 0
+      ? [
+          { name: 'Completed', value: completedGoalsCount },
+          { name: 'Remaining', value: remainingGoalsCount },
+        ]
+      : [
+          // Placeholder to render a visible ring when there are no goals
+          { name: 'Remaining', value: 1 },
+        ]),
+    [completedGoalsCount, remainingGoalsCount]
+  );
 
   const fetchGoals = async () => {
     try {
@@ -1159,63 +1181,54 @@ const Index = () => {
                 </div>
               </Card>
             )}
-            {/* Overview Stats (big numbers as before) */}
-            {goals.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard 
-                  title="Completed Goals"
-                  value={goals.filter(g => (g.current_progress || 0) >= g.target_count).length}
-                  variant="default"
-                  className="border-success/70"
-                />
-                <StatCard 
-                  title="Completed Subgoals"
-                  value={goals.reduce((acc, g) => acc + (g.subgoals?.filter(sg => (sg.current_progress || 0) >= sg.target_count).length || 0), 0)}
-                  variant="default"
-                  className="border-success/70"
-                />
-                <StatCard 
-                  title="Non Completed Goals"
-                  value={goals.filter(g => (g.current_progress || 0) < g.target_count).length}
-                  variant="default"
-                  className="border-primary/70"
-                />
-                <StatCard 
-                  title="Non Completed Subgoals"
-                  value={goals.reduce((acc, g) => acc + (g.subgoals?.filter(sg => (sg.current_progress || 0) < sg.target_count).length || 0), 0)}
-                  variant="default"
-                  className="border-primary/70"
-                />
-              </div>
-            )}
+            {/* Overview Stats (always visible, zeros if no data) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard 
+                title="Completed Goals"
+                value={goals.filter(g => (g.current_progress || 0) >= g.target_count).length}
+                variant="default"
+                className="border-success/70"
+              />
+              <StatCard 
+                title="Completed Subgoals"
+                value={goals.reduce((acc, g) => acc + (g.subgoals?.filter(sg => (sg.current_progress || 0) >= sg.target_count).length || 0), 0)}
+                variant="default"
+                className="border-success/70"
+              />
+              <StatCard 
+                title="Non Completed Goals"
+                value={goals.filter(g => (g.current_progress || 0) < g.target_count).length}
+                variant="default"
+                className="border-primary/70"
+              />
+              <StatCard 
+                title="Non Completed Subgoals"
+                value={goals.reduce((acc, g) => acc + (g.subgoals?.filter(sg => (sg.current_progress || 0) < sg.target_count).length || 0), 0)}
+                variant="default"
+                className="border-primary/70"
+              />
+            </div>
 
-            {/* Secondary row: Pie chart + Subgoal activity heatmap */}
-            {goals.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-                <div className="lg:col-span-1">
-                  <ProgressChart 
-                    title="Completed vs Remaining"
-                    type="pie"
-                    data={[
-                      { name: 'Completed', value: goals.filter(g => (g.current_progress || 0) >= g.target_count).length },
-                      { name: 'Remaining', value: goals.filter(g => (g.current_progress || 0) < g.target_count).length },
-                    ]}
-                    height={260}
-                  />
-                </div>
-                <div className="lg:col-span-2">
-                  <SubgoalActivityHeatmap weeks={52} />
-                </div>
+            {/* Secondary row: Pie chart + Subgoal activity heatmap (always visible) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+              <div className="lg:col-span-1">
+                <ProgressChart 
+                  title="Completed vs Remaining"
+                  type="pie"
+                  data={pieData}
+                  height={300}
+                />
               </div>
-            )}
+              <div className="lg:col-span-2">
+                <SubgoalActivityHeatmap weeks={52} height={300} />
+              </div>
+            </div>
 
-            {/* Line charts side-by-side (same space). Order: Goals then Subgoals */}
-            {goals.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <MonthlyGoalCompletionsChart months={9} height={320} />
-                <MonthlyTotalsChart months={9} height={320} />
-              </div>
-            )}
+            {/* Line charts side-by-side (always visible). Order: Goals then Subgoals */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <MonthlyGoalCompletionsChart months={9} height={320} />
+              <MonthlyTotalsChart months={9} height={320} />
+            </div>
 
           </TabsContent>
         </Tabs>
